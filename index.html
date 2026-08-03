@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARQUET — Simulateur de carrière NBA</title>
+<link rel="stylesheet" href="parquet.css">
+</head>
+<body>
+
+<!-- ═══════════════ LOGO ═══════════════
+     Un ballon de basket dessiné au trait — seules les coutures suffisent
+     à le reconnaître, même à la taille d'une icône. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Les styles sont posés en attributs : un <use> crée un arbre fantôme
+       que les sélecteurs CSS externes ne traversent pas. Les variables,
+       elles, sont héritées et suivent donc le thème. -->
+  <symbol id="mark" viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="26" fill="none" stroke="var(--leather)" stroke-width="3.4"/>
+    <path d="M32,6 V58 M6,32 H58 M14,14 Q32,32 14,50 M50,14 Q32,32 50,50"
+          fill="none" stroke="var(--leather)" stroke-width="3.4" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<!-- badge de marque, fixe en haut à droite sur tous les écrans -->
+<button id="brand-corner" class="brand-corner" aria-label="PARQUET — accueil" title="Accueil">
+  <svg class="mark" viewBox="0 0 64 64"><use href="#mark"></use></svg>
+</button>
+
+<div id="app">
+
+  <!-- ═══════════════ ÉCRAN TITRE ═══════════════ -->
+  <section id="screen-boot" class="screen screen-boot">
+    <div class="boot-court" aria-hidden="true">
+      <div class="boot-arc"></div>
+      <div class="boot-key"></div>
+      <div class="boot-halfline"></div>
+    </div>
+
+    <div class="boot-inner">
+      <button id="btn-profile" class="profile-chip">
+        <span class="profile-emblem" id="profile-emblem">🏀</span>
+        <span class="profile-name" id="profile-name">Compte</span>
+        <span class="profile-caret">▾</span>
+      </button>
+
+      <div class="boot-eyebrow">Simulateur de carrière · Basket</div>
+      <h1 class="boot-title">PARQUET</h1>
+      <p class="boot-tag">De la salle de lycée aux chevrons du plafond.<br>Chaque décision écrit ta légende.</p>
+
+      <div class="boot-actions">
+        <button id="btn-resume" class="btn btn-accent btn-block hidden">Reprendre la carrière</button>
+        <button id="btn-new" class="btn btn-accent btn-block">Carrière solo</button>
+        <button id="btn-mp" class="btn btn-quiet btn-block">Mode rivalité — 2 à 4 joueurs</button>
+        <button id="btn-codes" class="btn btn-quiet btn-block">Codes de carrière</button>
+        <button id="btn-pantheon" class="btn btn-quiet btn-block">Panthéon</button>
+      </div>
+
+      <div class="boot-meta">
+        <span><b id="boot-careers">0</b> carrière(s) au Panthéon</span>
+        <span class="dot">·</span>
+        <span><b>36</b> badges</span>
+        <span class="dot">·</span>
+        <span><b>30</b> franchises</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ CRÉATION ═══════════════ -->
+  <section id="screen-create" class="screen screen-create hidden">
+    <div class="create-shell">
+      <header class="create-head">
+        <button id="btn-create-back" class="btn-icon" aria-label="Retour">←</button>
+        <div class="create-steps" id="create-steps"></div>
+      </header>
+      <div class="create-body" id="create-body"></div>
+      <footer class="create-foot" id="create-foot"></footer>
+    </div>
+  </section>
+
+  <!-- ═══════════════ JEU ═══════════════ -->
+  <section id="screen-game" class="screen screen-game hidden">
+
+    <header class="scorebug" id="scorebug">
+      <div class="sb-stripe" id="sb-stripe"></div>
+      <div class="sb-num" id="sb-num">0</div>
+      <div class="sb-id">
+        <div class="sb-name" id="sb-name">—</div>
+        <div class="sb-sub" id="sb-sub">—</div>
+      </div>
+      <div class="sb-ovr">
+        <div class="sb-ovr-val" id="sb-ovr">—</div>
+        <div class="sb-ovr-lbl">OVR</div>
+      </div>
+      <div class="sb-season">
+        <div class="sb-season-val" id="sb-season">—</div>
+        <div class="sb-season-lbl" id="sb-phase">—</div>
+      </div>
+      <button id="btn-menu" class="btn-icon sb-menu" aria-label="Menu" title="Menu">☰</button>
+    </header>
+
+    <nav class="tabbar" id="tabbar">
+      <button class="tab is-active" data-tab="feed">Carrière</button>
+      <button class="tab" data-tab="player">Joueur</button>
+      <button class="tab" data-tab="league">Ligue</button>
+    </nav>
+
+    <div class="console">
+
+      <!-- RAIL GAUCHE : joueur -->
+      <aside class="rail rail-left" id="pane-player">
+        <div class="card vitals">
+          <div class="vital">
+            <span class="vital-lbl">Forme</span>
+            <span class="meter"><span class="meter-fill" id="m-form"></span></span>
+            <span class="vital-val" id="v-form">—</span>
+          </div>
+          <div class="vital">
+            <span class="vital-lbl">Moral</span>
+            <span class="meter"><span class="meter-fill" id="m-morale"></span></span>
+            <span class="vital-val" id="v-morale">—</span>
+          </div>
+          <div class="vital">
+            <span class="vital-lbl">Santé</span>
+            <span class="meter"><span class="meter-fill" id="m-health"></span></span>
+            <span class="vital-val" id="v-health">—</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Relations</h3>
+          <div id="rel-body" class="vitals"></div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Entourage</h3>
+          <div id="cast-body" class="cast-body"></div>
+        </div>
+
+        <div class="card" id="card-contract">
+          <h3 class="card-title">Contrat</h3>
+          <div id="contract-body" class="contract-body"></div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Attributs</h3>
+          <div id="attrs-body" class="attrs-body"></div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Badges <span class="card-count" id="badge-count">0/36</span></h3>
+          <div id="badges-body" class="badges-grid"></div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Carrière</h3>
+          <div id="career-body" class="career-body"></div>
+          <canvas id="arc-chart" class="arc-chart" width="560" height="160"></canvas>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Palmarès</h3>
+          <div id="trophies-body" class="trophies-body"></div>
+        </div>
+      </aside>
+
+      <!-- CENTRE : fil -->
+      <main class="feed-col" id="pane-feed">
+        <div id="feed" class="feed"></div>
+      </main>
+
+      <!-- RAIL DROITE : ligue -->
+      <aside class="rail rail-right" id="pane-league">
+        <div class="card">
+          <h3 class="card-title">Ma saison</h3>
+          <div id="myseason-body" class="myseason-body"></div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Course au MVP <span class="card-count">note</span></h3>
+          <div id="mvp-body" class="rank-body"></div>
+        </div>
+        <div class="card hidden" id="card-versus">
+          <h3 class="card-title">Face à face</h3>
+          <div id="versus-body" class="rank-body"></div>
+        </div>
+        <div class="card">
+          <h3 class="card-title" id="standings-title">Classement</h3>
+          <div id="standings-body" class="rank-body"></div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Meilleurs marqueurs</h3>
+          <div id="leaders-body" class="rank-body"></div>
+        </div>
+      </aside>
+
+    </div>
+
+    <!-- Pas de bouton : on touche le fil pour faire avancer la suite.
+         La pastille en bas rappelle discrètement le geste et où on en est. -->
+    <footer class="tapbar" id="tapbar">
+      <span class="tap-hint" id="tap-hint">
+        <span class="tap-dot"></span>
+        <span id="tap-label">Touche l'écran pour continuer</span>
+      </span>
+    </footer>
+  </section>
+
+  <!-- ═══════════════ FIN DE CARRIÈRE ═══════════════ -->
+  <section id="screen-end" class="screen screen-end hidden">
+    <div class="end-shell" id="end-shell"></div>
+  </section>
+
+  <!-- ═══════════════ COMPTES ═══════════════ -->
+  <section id="screen-profile" class="screen screen-create hidden">
+    <div class="create-shell">
+      <header class="create-head">
+        <button id="btn-profile-back" class="btn-icon" aria-label="Retour">←</button>
+        <div class="create-steps"><i class="now"></i></div>
+      </header>
+      <div class="create-body" id="profile-body"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ CODES DE CARRIÈRE ═══════════════ -->
+  <section id="screen-codes" class="screen screen-create hidden">
+    <div class="create-shell">
+      <header class="create-head">
+        <button id="btn-codes-back" class="btn-icon" aria-label="Retour">←</button>
+        <div class="create-steps"><i class="now"></i></div>
+      </header>
+      <div class="create-body" id="codes-body"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ PANTHÉON ═══════════════ -->
+  <section id="screen-pantheon" class="screen screen-pantheon hidden">
+    <div class="pantheon-shell">
+      <header class="pantheon-head">
+        <button id="btn-pantheon-back" class="btn-icon" aria-label="Retour">←</button>
+        <h2>Panthéon</h2>
+      </header>
+      <div id="pantheon-body" class="pantheon-body"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ MODALE DE DÉCISION ═══════════════ -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <button id="modal-close" class="modal-close hidden" aria-label="Reporter ce choix">✕</button>
+      <div class="modal-kicker" id="modal-kicker">Décision</div>
+      <h2 class="modal-head" id="modal-head"></h2>
+      <p class="modal-body" id="modal-body"></p>
+      <div class="modal-choices" id="modal-choices"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="profile.js"></script>
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script src="meta.js"></script>
+<script src="cast.js"></script>
+<script src="scenarios.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
