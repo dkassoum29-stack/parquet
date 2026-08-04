@@ -74,7 +74,7 @@
         <button id="btn-resume" class="btn btn-accent btn-block hidden">Reprendre la carrière</button>
         <button id="btn-new" class="btn btn-accent btn-block">Carrière solo</button>
         <button id="btn-mp" class="btn btn-quiet btn-block">Mode rivalité — 2 à 4 joueurs</button>
-        <button id="btn-codes" class="btn btn-quiet btn-block">Codes de carrière</button>
+        <button id="btn-duel" class="btn btn-quiet btn-block">Monde multijoueur</button>
         <button id="btn-pantheon" class="btn btn-quiet btn-block">Panthéon</button>
       </div>
 
@@ -243,17 +243,6 @@
     </div>
   </section>
 
-  <!-- ═══════════════ CODES DE CARRIÈRE ═══════════════ -->
-  <section id="screen-codes" class="screen screen-create hidden">
-    <div class="create-shell">
-      <header class="create-head">
-        <button id="btn-codes-back" class="btn-icon" aria-label="Retour">←</button>
-        <div class="create-steps"><i class="now"></i></div>
-      </header>
-      <div class="create-body" id="codes-body"></div>
-    </div>
-  </section>
-
   <!-- ═══════════════ PANTHÉON ═══════════════ -->
   <section id="screen-pantheon" class="screen screen-pantheon hidden">
     <div class="pantheon-shell">
@@ -262,6 +251,48 @@
         <h2>Panthéon</h2>
       </header>
       <div id="pantheon-body" class="pantheon-body"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ DUEL EN DIRECT ═══════════════ -->
+  <section id="screen-duel-lobby" class="screen screen-create hidden">
+    <div class="create-shell">
+      <header class="create-head">
+        <button id="btn-duel-back" class="btn-icon" aria-label="Retour">←</button>
+        <div class="create-steps"><i class="now"></i></div>
+      </header>
+      <div class="create-body" id="duel-lobby-body"></div>
+    </div>
+  </section>
+
+  <section id="screen-duel-live" class="screen screen-duel hidden">
+    <header class="scorebug duel-scorebug" id="duel-scorebug"></header>
+    <div class="duel-status-strip" id="duel-status-strip"></div>
+    <div class="duel-feed" id="duel-feed"></div>
+    <div class="duel-arena" id="duel-arena"></div>
+  </section>
+
+  <section id="screen-duel-result" class="screen screen-end hidden">
+    <div class="end-shell" id="duel-result-shell"></div>
+  </section>
+
+  <section id="screen-duel-leaderboard" class="screen screen-pantheon hidden">
+    <div class="pantheon-shell">
+      <header class="pantheon-head">
+        <button id="btn-duel-leaderboard-back" class="btn-icon" aria-label="Retour">←</button>
+        <h2>Classement général</h2>
+      </header>
+      <div id="duel-leaderboard-body" class="pantheon-body"></div>
+    </div>
+  </section>
+
+  <section id="screen-world-season" class="screen screen-pantheon hidden">
+    <div class="pantheon-shell">
+      <header class="pantheon-head">
+        <button id="btn-world-season-back" class="btn-icon" aria-label="Retour">←</button>
+        <h2 id="world-season-title">Saison</h2>
+      </header>
+      <div id="world-season-body" class="pantheon-body"></div>
     </div>
   </section>
 
@@ -278,6 +309,10 @@
 
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="bundle.js"></script>
 </body>
 </html>

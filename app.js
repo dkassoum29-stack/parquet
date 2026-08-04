@@ -125,6 +125,7 @@ function beat(o) {
     b.appendChild(el("div", "poster-title", o.head || ""));
     if (o.body) b.appendChild(el("div", "poster-sub", o.body));
     b.appendChild(el("div", "poster-rule"));
+    if (o.box) b.appendChild(o.box);
     if (o.pills && o.pills.length) {
       const wrap = el("div", "beat-pills");
       o.pills.forEach((p) => wrap.appendChild(el("span", "pill " + (p.k || ""), p.t)));
@@ -164,6 +165,84 @@ function beat(o) {
   setTimeout(() => {
     try { b.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
   }, delay);
+}
+
+/* ─── habillages « média » : un même événement peut se lire comme un
+   SMS reçu, une manchette de journal ou une poignée de réactions,
+   au lieu d'un simple compte-rendu. Réservé aux moments qui le
+   justifient : la surprise n'accroche que si elle reste rare. */
+
+/* un champ peut être un texte fixe ou une liste de variantes : dans
+   ce cas on en tire une au hasard, pour qu'un même instant ne se lise
+   jamais deux fois pareil d'une carrière à l'autre */
+const pickText = (v) => (Array.isArray(v) ? ENG.R.pick(v) : v);
+
+/* petites icônes maison plutôt que des emoji : même stroke, même
+   grille 24×24, couleur héritée via currentColor pour rester lisibles
+   dans les deux thèmes. Le ballon reprend le tracé du logo de marque. */
+const ICONS = {
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21C12 21 4 14.5 4 9.5C4 6.9 6.1 5 8.5 5C10 5 11.3 5.8 12 7C12.7 5.8 14 5 15.5 5C17.9 5 20 6.9 20 9.5C20 14.5 12 21 12 21Z"/></svg>',
+  briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>',
+  ball: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17M3.5 12h17M6.3 6.3c2.6 2.6 2.6 8.8 0 11.4M17.7 6.3c-2.6 2.6-2.6 8.8 0 11.4"/></svg>',
+  flame: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2C9 6 7 8.5 7 12.5C7 16.6 9.4 20 12.5 20C15.9 20 18 17.2 18 14C18 11.5 16.5 10 15.5 11C16 8.5 14.5 5 12 2Z"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L4.5 14H11L10 22L19.5 9H13L13 2Z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.5 12.5L10.5 15.5L16.5 8.5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+function icon(name) {
+  const wrap = el("span", "icon icon-" + name);
+  wrap.innerHTML = ICONS[name] || ICONS.ball;
+  return wrap;
+}
+
+function smsCard(o) {
+  const wrap = el("div", "box media-sms");
+  const head = el("div", "sms-head");
+  const av = el("span", "sms-avatar"); av.appendChild(icon(o.icon || "heart"));
+  head.appendChild(av);
+  const who = el("div", "sms-who");
+  who.appendChild(el("div", "sms-name", o.from));
+  if (o.sub) who.appendChild(el("div", "sms-sub", o.sub));
+  head.appendChild(who);
+  head.appendChild(el("span", "sms-ts", "maintenant"));
+  wrap.appendChild(head);
+  wrap.appendChild(el("div", "sms-bubble", pickText(o.text)));
+  return wrap;
+}
+
+function headlineCard(o) {
+  const wrap = el("div", "box media-headline");
+  const top = el("div", "headline-top");
+  const badge = el("span", "headline-badge"); badge.appendChild(icon("bolt"));
+  top.appendChild(badge);
+  top.appendChild(el("span", "headline-outlet", o.outlet));
+  top.appendChild(el("span", "headline-kicker", o.kicker || "Dernière minute"));
+  wrap.appendChild(top);
+  wrap.appendChild(el("div", "headline-title", pickText(o.headline)));
+  if (o.dek) wrap.appendChild(el("div", "headline-dek", pickText(o.dek)));
+  return wrap;
+}
+
+function socialCard(o) {
+  const wrap = el("div", "box media-social");
+  const top = el("div", "social-top");
+  top.appendChild(el("span", "social-platform", "Sur " + (o.platform || "X")));
+  top.appendChild(el("span", "social-live", "● en direct"));
+  wrap.appendChild(top);
+  o.posts.forEach((p) => {
+    const row = el("div", "social-post");
+    const av = el("span", "social-avatar"); av.appendChild(icon(p.icon || "ball"));
+    row.appendChild(av);
+    const body = el("div", "social-body");
+    const line = el("div", "social-line");
+    line.appendChild(el("span", "social-name", p.name));
+    if (p.verified !== false) { const chk = el("span", "social-check"); chk.appendChild(icon("check")); line.appendChild(chk); }
+    line.appendChild(el("span", "social-handle", p.handle));
+    body.appendChild(line);
+    body.appendChild(el("div", "social-text", pickText(p.text)));
+    row.appendChild(body);
+    wrap.appendChild(row);
+  });
+  return wrap;
 }
 
 function statTable(rows, headers) {
@@ -666,7 +745,9 @@ function queueSeason() {
   if (ph === "hs") S.queue = ["event", "season", "hsCheck"];
   else if (ph === "ncaa") S.queue = ["event", "season", "ncaaCheck"];
   else if (ph === "prep") S.queue = ["event", "season", "toDraft"];
-  else if (ph === "pro") S.queue = ["offseason", "event", "season", "event", "contract"];
+  else if (ph === "pro") {
+    S.queue = ["offseason", "event", "season", "event", "contract"];
+  }
   else S.queue = [];
 }
 
@@ -839,9 +920,20 @@ STEPS.event = function () {
            avant qu'on sache ce qu'il en est advenu */
         const susp = res.kind === "epic" ? ENG.R.pick(["Le ballon quitte tes mains…", "La salle retient son souffle…", "Tout se joue maintenant…"])
                    : res.kind === "ring" ? "Le buzzer approche…"
-                   : res.kind === "trophy" ? "L'annonce arrive…" : null;
+                   : res.kind === "trophy" ? "L'annonce arrive…"
+                   : res.flag === "traded" ? "Ton téléphone se met à vibrer sans s'arrêter…" : null;
+        /* la scène « transfert appris par notification » se lit littéralement :
+           le texte narratif introduit l'écran, la notif suit en dessous */
+        const notifBox = res.flag === "traded"
+          ? smsCard({ from: S.cast.agent.name, sub: "ton agent", icon: "briefcase",
+                      text: [
+                        "Je viens d'avoir la confirmation. C'est fait, tu changes d'équipe. Je t'appelle dans la minute, ne panique pas.",
+                        "Ça vient de tomber, c'est officiel. Je sais que c'est brutal comme ça, mais respire — je t'explique tout au téléphone.",
+                        "Je voulais te l'annoncer moi-même mais l'info a fuité avant. C'est confirmé, tu es transféré. J'arrive.",
+                      ] })
+          : null;
         beat({ kind: res.kind, tag: staged.kicker, src: S.cast.journo.outlet,
-               teaser: susp, head: staged.head, body: res.text, pills: res.pills });
+               teaser: susp, head: staged.head, body: res.text, pills: res.pills, box: notifBox });
         if (res.flag) S.pending = res.flag;
         setActionEnabled(true);
       },
@@ -1082,6 +1174,29 @@ STEPS.awards = function () {
       body: `${ENG.name(p)} est récompensé au terme de la saison ${S.calendar.year}.`,
       pills: won.map((w) => ({ t: w[1] + " " + w[0], k: "star" })),
     });
+    if (isMe(aw.mvp)) {
+      const j = S.cast.journo;
+      const n = ENG.name(p);
+      const quoteByStance = {
+        hostile: [`On peut discuter des chiffres, mais la ligue a tranché`, `Pas mon choix, mais les votants ont parlé`],
+        sharp:   [`Les chiffres ne mentent pas, et cette saison encore moins`, `Une domination lisible dans la moindre statistique`],
+        lazy:    [`Bon, difficile de voter contre lui cette fois`, `Même sans creuser, l'écart saute aux yeux`],
+        friendly:[`Une saison sans équivalent`, `Le genre de campagne qu'on ne voit qu'une fois par génération`],
+      };
+      beat({
+        kind: "wire", tag: "Une",
+        teaser: "La presse s'empare déjà de la nouvelle…",
+        box: headlineCard({
+          outlet: j.outlet, kicker: "MVP " + S.calendar.year,
+          headline: [
+            `${n}, LE MEILLEUR DE LA LIGUE`,
+            `${n} COURONNÉ MVP ${S.calendar.year}`,
+            `SANS DÉBAT : ${n} EST MVP`,
+          ],
+          dek: `${j.name} : « ${ENG.R.pick(quoteByStance[j.stance.id] || quoteByStance.friendly)} — ${n} s'impose comme MVP ${S.calendar.year}. »`,
+        }),
+      });
+    }
   } else {
     beat({
       kind: "wire", tag: "Trophées", src: "Cérémonie de la ligue",
@@ -1135,6 +1250,23 @@ STEPS.playoffs = function () {
       head: `${teamOf(p.team).full} est champion`,
       body: `Titre remporté ${po.finalsScore.replace("-", "–")} face à ${po.opponent ? teamOf(po.opponent.id).full : "l'Ouest"}. ${ENG.name(p)} tourne à ${poLine.ppg.toFixed(1).replace(".", ",")} points de moyenne en playoffs${fmvp ? " et est élu MVP des Finales" : ""}.`,
       pills: [{ t: "💍 Bague n°" + p.rings, k: "star" }],
+    });
+    const mate = S.cast.mates[0], rival = S.cast.rivals[0], firstName = ENG.name(p).split(" ")[0];
+    beat({
+      kind: "wire", tag: "Ça réagit",
+      teaser: "Les réactions commencent déjà à affluer…",
+      box: socialCard({
+        posts: [
+          { name: mate.name, handle: mate.role.label, icon: "ball",
+            text: fmvp
+              ? [`on a gagné avec un GOAT dans le vestiaire, j'ai pas d'autres mots 🐐🏆`, `jouer à côté de lui cette saison, c'était voir la grandeur de près. MVP des Finales amplement mérité 🏆`, `ce mec a porté l'équipe entière en finale. légende vivante 🐐`]
+              : [`champions !! cette équipe, cette ville, cette bague. jamais je n'oublierai cette saison 🏆`, `ON L'A FAIT 🏆 tout ce sang et cette sueur, pour CE moment. je pleure`, `bague numéro ${p.rings} 💍 cette équipe restera gravée à jamais`] },
+          { name: rival.name, handle: rival.style, icon: "flame",
+            text: rival.heat >= 55
+              ? [`Titre mérité. On se retrouvera l'an prochain, ${firstName}.`, `Chapeau ${firstName}. Cette fois c'est vous. La prochaine, c'est nous.`, `Respect pour cette série, ${firstName}. Le duel continue la saison prochaine.`]
+              : [`Bravo, c'était la meilleure équipe cette année. Respect.`, `Bien mérité. Une saison sans faille de leur part.`, `Rien à redire, ils ont dominé du premier au dernier match.`] },
+        ],
+      }),
     });
     p.morale = 100; p.fame = ENG.clamp(p.fame + 12, 0, 100); p.rep = ENG.clamp(p.rep + 10, 0, 100);
   } else {
@@ -1322,6 +1454,33 @@ function runDraft() {
     p.morale = ENG.clamp(p.morale + 18, 5, 100);
   }
 
+  const fam = S.cast.family.parent;
+  const draftedTeam = teamOf(p.team).full;
+  beat({
+    kind: "wire", tag: "Ton monde", src: "Messages",
+    teaser: "Ton téléphone n'arrête plus de vibrer…",
+    box: smsCard({
+      from: fam.name, sub: fam.role, icon: "heart",
+      text: res.undrafted
+        ? [
+            "Je sais que c'est pas la soirée que tu voulais. Mais un two-way c'est une porte, pas une fin. On est fiers de toi, quoi qu'il arrive.",
+            "Le téléphone n'a pas sonné ce soir, je sais. Mais je te connais, tu vas leur prouver qu'ils ont eu tort. On est là.",
+            "Soixante noms et pas le tien, ça fait mal, je le vois. Mais rien n'est fini. On croit en toi à fond.",
+          ]
+        : res.pick <= 5
+        ? [
+            `JE HURLE 😭 Toute la famille est devant la télé là. ${draftedTeam}, ${res.pick}ᵉ choix, tu te rends compte ?? On arrive te voir jouer dès que possible.`,
+            `Ton nom à l'écran, ${res.pick}ᵉ, ${draftedTeam}... j'ai les larmes aux yeux là. Tout ce travail, enfin récompensé. On est SI fiers.`,
+            `Le salon entier a explosé quand ils ont annoncé ton nom. ${res.pick}ᵉ choix par ${draftedTeam} !! On rapplique dès que possible, promis.`,
+          ]
+        : [
+            `Ça y est, c'est officiel ! ${draftedTeam}. Fier de toi, tu l'as mérité. Appelle-nous quand t'as une minute.`,
+            `${draftedTeam}, te voilà. On a suivi ça en direct, on n'a pas raté une seconde. Bravo, tu l'as fait.`,
+            `C'est acté : ${draftedTeam} t'a choisi. Après tout ce chemin... on savait que ce jour arriverait. Profite à fond ce soir.`,
+          ],
+    }),
+  });
+
   S.teamsSeen = [p.team];
   p.career.teamsPlayed = 1;
   p.career.yearsSameTeam = 0;
@@ -1355,6 +1514,18 @@ STEPS.contract = function () {
     beat({ kind: "wire", tag: "Transfert", src: "Le Fil NBA",
            head: `${ENG.name(p)} rejoint ${dest.full}`,
            body: "L'échange est officialisé pendant l'intersaison." });
+    beat({
+      kind: "wire", tag: "Ton monde", src: "Messages",
+      teaser: "Ton agent essaie de te joindre…",
+      box: smsCard({
+        from: S.cast.agent.name, sub: "ton agent", icon: "briefcase",
+        text: [
+          `C'est fait, c'est officiel. ${dest.full} t'attend. On en parle dès que tu veux, mais globalement c'est une bonne nouvelle pour la suite.`,
+          `Voilà, le dossier est bouclé. Direction ${dest.full}. Prends le temps d'encaisser, on débriefe bientôt.`,
+          `${dest.full}, signé. Je sais que c'est un changement, mais je pense sincèrement que c'est le bon move pour la suite.`,
+        ],
+      }),
+    });
     S.pending = null;
   }
 
@@ -1425,6 +1596,24 @@ function afterContract() {
           head: `${ENG.name(p)} signe ${o.years} ans à ${o.t.full}`,
           body: `Un contrat de ${ENG.money(o.salary * o.years)} au total, soit ${ENG.money(o.salary)} par saison.`,
           pills: [{ t: ENG.money(o.salary) + "/an", k: "up" }, { t: o.years + " ans", k: "" }],
+        });
+        beat({
+          kind: "wire", tag: "Ton monde", src: "Messages",
+          teaser: "Un message arrive…",
+          box: smsCard({
+            from: S.cast.agent.name, sub: "ton agent", icon: "briefcase",
+            text: moved
+              ? [
+                  `Signé, cacheté ! ${ENG.money(o.salary)} par an sur ${o.years} ans. Je t'envoie les détails du contrat ce soir, mais tu peux souffler.`,
+                  `C'est dans la boîte. ${ENG.money(o.salary)}/an, ${o.years} ans. On a fait du bon boulot sur ce dossier, profite du moment.`,
+                  `Fini les négociations, tout est signé. ${o.years} ans à ${ENG.money(o.salary)} par saison. Repose-toi, tu l'as gagné.`,
+                ]
+              : [
+                  `On reste à la maison, et à ce prix-là. Bon travail, tu as fait le bon choix.`,
+                  `Prolongation bouclée. Rester ici avait du sens, et le montant le confirme.`,
+                  `Voilà, c'est signé, tu restes. Parfois la meilleure décision c'est de ne rien changer.`,
+                ],
+          }),
         });
         setActionEnabled(true);
       },
@@ -1677,38 +1866,6 @@ function buildNationSearch(b) {
   }
 }
 
-/* ─────────── rejoindre avec le code d'un ami ───────────
-   À charger avant même que la carrière ne commence : le rival choisi
-   ici entrera dans la toute première ligue, dès finishCreate(). */
-function buildFriendCodeField(b) {
-  const wrap = el("div", "field friend-code-field");
-  wrap.appendChild(el("span", null, "Code d'un ami (facultatif)"));
-  const row = el("div", "field-row");
-  const inp = el("input");
-  inp.type = "text";
-  inp.placeholder = "PRQ-…";
-  inp.value = W._friendCode || "";
-  inp.oninput = () => { W._friendCode = inp.value; };
-  const go = el("button", "btn btn-quiet", "Ajouter");
-  go.type = "button";
-  row.appendChild(inp);
-  row.appendChild(go);
-  wrap.appendChild(row);
-  const msg = el("div", "opt-t");
-  msg.style.marginTop = "6px";
-  wrap.appendChild(msg);
-
-  go.onclick = () => {
-    const o = ENG.importCode(inp.value);
-    if (!o) { msg.textContent = "Code invalide — vérifie qu'il est complet."; return; }
-    if (!META.addRival(o)) { msg.textContent = o.n + " est déjà dans tes rivaux."; return; }
-    inp.value = ""; W._friendCode = "";
-    msg.textContent = `${o.n} (${o.po}, ${o.o} d'évaluation) rejoindra ta ligue dès le début de la carrière.`;
-  };
-
-  b.appendChild(wrap);
-}
-
 function startCreate() {
   W = {
     step: 0,
@@ -1792,7 +1949,6 @@ function drawStep() {
       b.appendChild(nf);
 
       buildNationSearch(b);
-      buildFriendCodeField(b);
 
       nextBtn("Continuer", W.cfg.first.trim() && W.cfg.last.trim() && W.cfg.nation);
       break;
@@ -1911,17 +2067,6 @@ function finishCreate() {
   show("screen-game");
   $("feed").innerHTML = "";
 
-  /* les rivaux reçus par code entrent dans cette ligue */
-  const imported = META.getRivals();
-  imported.forEach((r) => injectRival(r));
-  if (imported.length) {
-    beat({ kind: "wire", tag: "Ta génération", src: "Parquet",
-           head: imported.length === 1 ? "Un rival connu dans la ligue" : `${imported.length} rivaux connus dans la ligue`,
-           body: imported.map((r) => r.n).join(", ") + " " +
-                 (imported.length === 1 ? "évolue" : "évoluent") +
-                 " dans le même championnat que toi. Vous vous croiserez." });
-  }
-
   const origin = DATA.ORIGINS.find((o) => o.id === p.origin);
   const cs = S.cast;
   beat({
@@ -1963,14 +2108,11 @@ function finishCreate() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   MULTIJOUEUR
-   Deux modes, tous deux hors ligne :
-   — Rivalité : 2 à 4 carrières dans LA MÊME ligue, chacun son
-     tour, saison par saison. Vous vous disputez le même MVP, le
-     même titre, les mêmes places au classement.
-   — Codes de carrière : on exporte un joueur en une chaîne de
-     caractères, l'ami l'importe et le joueur entre dans sa ligue
-     comme rival réel.
+   MULTIJOUEUR HORS LIGNE — mode rivalité
+   2 à 4 carrières dans LA MÊME ligue, chacun son tour, saison
+   par saison. Vous vous disputez le même MVP, le même titre, les
+   mêmes places au classement. (Le duel en direct, en ligne et en
+   temps réel, vit dans duel.js.)
    ═══════════════════════════════════════════════════════════ */
 
 const MP_FIELDS = ["p", "cast", "phase", "stageYear", "calendar", "queue", "recent",
@@ -2170,153 +2312,6 @@ function b64enc(s) { return btoa(unescape(encodeURIComponent(s))); }
 function b64dec(s) { return decodeURIComponent(escape(atob(s))); }
 
 /* ═══════════════════════════════════════════════════════════
-   CODES DE CARRIÈRE — format court
-   Un joueur résumé en une chaîne courte façon clé de licence, plutôt
-   qu'un bloc de texte base64 illisible. Tous les champs numériques
-   sont compactés en un seul nombre (radix mixte) puis encodés en
-   base36 ; seul le nom reste en clair, parce qu'il n'y a aucune
-   raison de le cacher et que ça rend le code lisible d'un coup d'œil.
-
-   Forme :  PRQ-<poste><pays>-<8 chars><témoin>-<Nom.De.Famille>
-   Exemple : PRQ-FBF-0K9QX2P1J-Ousmane.Sawadogo
-   ═══════════════════════════════════════════════════════════ */
-
-const CODE_POS = { PG: "M", SG: "A", SF: "F", PF: "W", C: "C" };
-const CODE_POS_R = { M: "PG", A: "SG", F: "SF", W: "PF", C: "C" };
-
-/* témoin simple : détecte une faute de frappe sans cryptographie */
-function codeChecksum(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 1296;
-  return h.toString(36).toUpperCase().padStart(2, "0");
-}
-
-ENG.exportCode = function (p) {
-  const c = p.career;
-  const ovr = ENG.clamp(ENG.ovr(p), 0, 99);
-  const ageR = ENG.clamp(p.age - 16, 0, 29);
-  const seasons = ENG.clamp(c.seasons, 0, 30);
-  const ppgHalf = ENG.clamp(Math.round((c.gp ? c.pts / c.gp : 0) * 2), 0, 80);
-  const rings = ENG.clamp(p.rings, 0, 9);
-  const mvp = ENG.clamp(c.mvp, 0, 9);
-  const allStar = ENG.clamp(c.allStar, 0, 20);
-  const scoreR = ENG.clamp(ENG.careerScore(p), 1, 100) - 1;
-
-  let combined = ovr;
-  combined = combined * 30 + ageR;
-  combined = combined * 31 + seasons;
-  combined = combined * 81 + ppgHalf;
-  combined = combined * 10 + rings;
-  combined = combined * 10 + mvp;
-  combined = combined * 21 + allStar;
-  combined = combined * 100 + scoreR;
-
-  const token = combined.toString(36).toUpperCase().padStart(9, "0");
-  const posChar = CODE_POS[p.position] || "F";
-  const nat = (p.nation || "US").toUpperCase().slice(0, 2).padEnd(2, "X");
-  const header = posChar + nat;
-  const check = codeChecksum(header + token);
-  const name = ENG.name(p).replace(/\s+/g, ".");
-
-  return `PRQ-${header}-${token}${check}-${name}`;
-};
-
-ENG.importCode = function (code) {
-  try {
-    const m = String(code).trim().match(/^PRQ-([A-Z])([A-Z]{2})-([0-9A-Z]{9})([0-9A-Z]{2})-(.+)$/i);
-    if (!m) return null;
-    const posChar = m[1].toUpperCase(), nat = m[2].toUpperCase();
-    const token = m[3].toUpperCase(), check = m[4].toUpperCase();
-    const name = m[5].replace(/\./g, " ").trim();
-    if (!name) return null;
-    if (codeChecksum(posChar + nat + token) !== check) return null; /* code corrompu ou mal recopié */
-
-    let combined = parseInt(token, 36);
-    if (!Number.isFinite(combined)) return null;
-    const take = (radix) => { const v = combined % radix; combined = Math.floor(combined / radix); return v; };
-    const scoreR = take(100), allStar = take(21), mvp = take(10), rings = take(10),
-          ppgHalf = take(81), seasons = take(31), ageR = take(30), ovr = combined;
-
-    return {
-      n: name, po: CODE_POS_R[posChar] || "SF", nat,
-      o: ovr, a: ageR + 16, s: seasons, ppg: ppgHalf / 2,
-      r: rings, m: mvp, st: allStar, sc: scoreR + 1,
-    };
-  } catch (e) { return null; }
-};
-
-function injectRival(o) {
-  if (!S || !S.L) return false;
-  const id = "IMP" + (S.L.nextId++);
-  const ppg = o.ppg != null ? o.ppg : 12;
-  S.L.npcs.push({
-    id, imported: true, name: o.n, pos: o.po, style: "allrd",
-    ovr: ENG.clamp(o.o || 70, 40, 99), age: ENG.clamp((o.a || 24) - Math.max(0, (o.s || 0) - 2), 19, 34),
-    peak: 27, ceiling: ENG.clamp((o.o || 70) + 4, 40, 99),
-    team: ENG.R.pick(DATA.TEAMS).id, rookie: false, stats: null,
-    accolades: { mvp: o.m || 0, allNba: 0, allStar: o.st || 0, rings: o.r || 0 },
-  });
-  /* il devient aussi un rival nommé du casting */
-  if (S.cast) {
-    S.cast.rivals.push({ name: o.n, pos: o.po, team: S.L.npcs[S.L.npcs.length - 1].team,
-                         heat: 55, style: "importé d'une autre carrière" });
-  }
-  return true;
-}
-
-/* le joueur exportable : celui en cours, sinon celui de la sauvegarde */
-function exportablePlayer() {
-  if (S && S.p) return S.p;
-  const d = loadSave();
-  return d && d.p ? d.p : null;
-}
-
-/* L'écran ne sert plus qu'à récupérer son propre code : l'import se
-   fait désormais directement à la création du personnage, à l'étape
-   de la nationalité — c'est là qu'un ami rejoint la partie, pas dans
-   un sous-menu séparé. */
-function showCodes() {
-  const b = $("codes-body");
-  b.innerHTML = "";
-  b.appendChild(el("h1", "create-title", "Ton code de carrière"));
-  b.appendChild(el("p", "create-sub",
-    "Envoie-le à un ami : à la création de son joueur, il le colle dans le champ « Code d'un ami » et tu entres dans sa ligue comme rival réel — tu joueras tes saisons, tu apparaîtras dans ses classements, tu lui disputeras le MVP."));
-
-  const p = exportablePlayer();
-  const ex = el("label", "field");
-  ex.appendChild(el("span", null, p ? "Ton code — " + ENG.name(p) : "Ton code"));
-  const ta = el("input");
-  ta.type = "text";
-  ta.readOnly = true;
-  ta.className = "code-field";
-  ta.value = p ? ENG.exportCode(p) : "";
-  ta.placeholder = "Commence une carrière pour obtenir ton code.";
-  ex.appendChild(ta);
-  b.appendChild(ex);
-
-  if (p) {
-    const cp = el("button", "btn btn-accent btn-block", "Copier mon code");
-    cp.onclick = () => {
-      ta.focus(); ta.select(); ta.setSelectionRange(0, 999999);
-      const done = (ok) => {
-        cp.textContent = ok ? "Code copié" : "Copie manuelle : le champ est sélectionné";
-        setTimeout(() => (cp.textContent = "Copier mon code"), 2400);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(ta.value).then(() => done(true), () => {
-          try { done(document.execCommand("copy")); } catch (e) { done(false); }
-        });
-      } else {
-        try { done(document.execCommand("copy")); } catch (e) { done(false); }
-      }
-    };
-    b.appendChild(cp);
-  }
-
-  show("screen-codes");
-}
-
-/* ═══════════════════════════════════════════════════════════
    COMPTES
    Tout reste sur l'appareil. Chaque compte a sa carrière en cours,
    son Panthéon et sa mémoire longue, rangés séparément.
@@ -2482,9 +2477,1019 @@ function resumeInner() {
   setActionEnabled(true);
 }
 
+/* ═══════════════ DUEL EN DIRECT ═══════════════
+   Écran séparé de la carrière solo : DUEL_UI ne touche jamais S,
+   SAVE() ni HALL() — un duel ne peut rien casser dans une partie
+   en cours. */
+let DUEL_UI = null;
+
+function duelReset() {
+  DUEL.leaveRoom();
+  DUEL.leaveQueue();
+  duelClearCountdown();
+  DUEL_UI = { avatar: null, mySeat: null, code: null, isHost: false,
+              enteredLive: false, myProgress: null, oppProgress: null,
+              ended: false, mode: "online", perfect: true,
+              competition: "regular", roundsTotal: DUEL.ROUNDS_REGULAR,
+              halfShown: false, halfBonus: 0, halfBonusMechs: null,
+              feed: [], tauntSentThisRound: false,
+              aiAttrs: null, aiName: null, aiOnDone: null };
+}
+
+/* Petite carte de scouting avant le coup d'envoi — même motif que
+   les autres décisions (ask()), un seul choix pour continuer. */
+function duelShowScoutingThen(oppName, oppAttrs, onContinue) {
+  ask({
+    kicker: "Avant le coup d'envoi", head: "Face à " + oppName,
+    body: DUEL.scoutingLine(oppAttrs, oppName),
+    chain: false,
+    choices: [
+      { h: "C'est parti", d: "", t: "", pick: () => { setActionEnabled(true); onContinue(); } },
+    ],
+  });
+}
+
+function duelOpenLobby() {
+  duelReset();
+  show("screen-duel-lobby");
+  if (!DUEL.ready()) { worldDrawUnavailable(); return; }
+  const c = DUEL.getCharacter();
+  if (!c) worldDrawCreateCharacter(); else worldDrawHome();
+}
+
+function worldDrawUnavailable() {
+  const b = $("duel-lobby-body");
+  b.innerHTML = "";
+  b.appendChild(el("h2", "create-title", "Monde multijoueur"));
+  b.appendChild(el("p", "duel-msg", "Le monde multijoueur n'est pas encore configuré sur ce site."));
+}
+
+/* ─── création du personnage multijoueur (une fois par compte) ─── */
+function worldDrawCreateCharacter() {
+  const b = $("duel-lobby-body");
+  b.innerHTML = "";
+  b.appendChild(el("h2", "create-title", "Ton joueur multijoueur"));
+  b.appendChild(el("p", "duel-msg", "Un seul personnage, séparé de ta carrière solo, pour tout le monde multijoueur : saison, amis, adversaires aléatoires."));
+
+  const nameWrap = el("div", "field");
+  nameWrap.appendChild(el("span", null, "Nom (aussi ton pseudo au classement)"));
+  const nameInp = el("input");
+  nameInp.type = "text"; nameInp.placeholder = "Ton pseudo"; nameInp.maxLength = 18;
+  nameWrap.appendChild(nameInp);
+  b.appendChild(nameWrap);
+
+  const posWrap = el("div", "field");
+  posWrap.appendChild(el("span", null, "Poste"));
+  const posRow = el("div", "opts cols-3");
+  let selectedPos = DATA.POSITIONS[0].id;
+  DATA.POSITIONS.forEach((p) => {
+    const btn = el("button", "opt" + (p.id === selectedPos ? " on" : ""));
+    btn.type = "button";
+    btn.appendChild(el("div", "opt-h", p.label));
+    btn.onclick = () => {
+      selectedPos = p.id;
+      posRow.querySelectorAll(".opt").forEach((x) => x.classList.remove("on"));
+      btn.classList.add("on");
+    };
+    posRow.appendChild(btn);
+  });
+  posWrap.appendChild(posRow);
+  b.appendChild(posWrap);
+
+  const msg = el("p", "duel-msg", "");
+  const createBtn = el("button", "btn btn-accent btn-block", "Créer mon joueur");
+  createBtn.onclick = () => {
+    const name = nameInp.value.trim();
+    if (!name) { msg.textContent = "Entre un nom d'abord."; return; }
+    DUEL.createCharacter(name, selectedPos);
+    worldDrawHome();
+  };
+  b.appendChild(createBtn);
+  b.appendChild(msg);
+}
+
+/* ─── écran d'entrée du monde multijoueur ─── */
+function worldDrawHome() {
+  const c = DUEL.getCharacter();
+  const b = $("duel-lobby-body");
+  b.innerHTML = "";
+  b.appendChild(el("h2", "create-title", "Monde multijoueur"));
+
+  const card = el("div", "duel-seat-row ready");
+  const posLabel = (DATA.POSITIONS.find((p) => p.id === c.position) || {}).label || "";
+  card.appendChild(el("span", "duel-seat-name", ENG.name(c) + " · " + posLabel));
+  card.appendChild(el("span", "duel-seat-ovr", "OVR " + ENG.ovr(c)));
+  const gradeEl = el("span", "duel-seat-state", "…");
+  card.appendChild(gradeEl);
+  b.appendChild(card);
+  DUEL.getMyRating((rating) => { gradeEl.textContent = DUEL.rankLabel(rating) + " · " + rating; });
+
+  if ((c.badges || []).length) {
+    const badgeRow = el("p", "duel-msg", "Badges : " + c.badges.map((bd) => bd.label || bd).join(" · "));
+    b.appendChild(badgeRow);
+  }
+
+  const redoBtn = el("button", "btn btn-quiet btn-block", "Recommencer avec un nouveau joueur");
+  redoBtn.onclick = () => {
+    ask({
+      kicker: "Confirmation", head: "Recréer ton joueur multijoueur ?",
+      body: "Ton personnage actuel (attributs, franchise, badges) sera remplacé. Ta cote au classement général n'est pas affectée.",
+      chain: false,
+      choices: [
+        { h: "Non, garder ce joueur", d: "", t: "", pick: () => { setActionEnabled(true); worldDrawHome(); } },
+        { h: "Oui, recommencer", d: "", t: "", danger: true,
+          pick: () => { setActionEnabled(true); worldDrawCreateCharacter(); } },
+      ],
+    });
+  };
+  b.appendChild(redoBtn);
+
+  const boardBtn = el("button", "btn btn-quiet btn-block", "Voir le classement général");
+  boardBtn.onclick = () => duelOpenLeaderboard();
+  b.appendChild(boardBtn);
+
+  b.appendChild(el("div", "duel-or", "— — —"));
+
+  const seasonBtn = el("button", "btn btn-accent btn-block", "Jouer une saison");
+  seasonBtn.onclick = () => worldOpenSeason();
+  b.appendChild(seasonBtn);
+  b.appendChild(el("div", "duel-or", "— ou —"));
+
+  const msg = el("p", "duel-msg", "");
+
+  const randomBtn = el("button", "btn btn-quiet btn-block", "Adversaire aléatoire");
+  randomBtn.onclick = () => {
+    const av = DUEL.getCharacter();
+    DUEL_UI.avatar = av;
+    randomBtn.disabled = true;
+    duelDrawSearching();
+    DUEL.joinQueue(av, (code, err, status) => {
+      if (status === "waiting") { return; }
+      if (status === "error") { worldDrawHome(); $("duel-lobby-body").querySelector(".duel-msg").textContent = err || "Échec de la recherche."; return; }
+      DUEL_UI.mode = "online";
+      DUEL_UI.mySeat = DUEL.seat; DUEL_UI.code = code; DUEL_UI.isHost = status === "host";
+      duelDrawWaiting();
+    });
+  };
+  b.appendChild(randomBtn);
+  b.appendChild(el("div", "duel-or", "— ou —"));
+
+  const createBtn = el("button", "btn btn-quiet btn-block", "Créer un salon pour un ami");
+  createBtn.onclick = () => {
+    const av = DUEL.getCharacter();
+    createBtn.disabled = true; msg.textContent = "Création du salon…";
+    DUEL.createRoom(av, (code, err) => {
+      createBtn.disabled = false;
+      if (!code) { msg.textContent = err || "Échec de la création."; return; }
+      DUEL_UI.mode = "online";
+      DUEL_UI.avatar = av; DUEL_UI.mySeat = "A"; DUEL_UI.code = code; DUEL_UI.isHost = true;
+      duelDrawWaiting();
+    });
+  };
+  b.appendChild(createBtn);
+
+  const codeWrap = el("div", "field");
+  codeWrap.appendChild(el("span", null, "Code reçu de ton ami"));
+  const codeInp = el("input");
+  codeInp.type = "text"; codeInp.placeholder = "K7XQ4M"; codeInp.maxLength = 6;
+  codeInp.style.textTransform = "uppercase";
+  codeWrap.appendChild(codeInp);
+  b.appendChild(codeWrap);
+
+  const joinBtn = el("button", "btn btn-quiet btn-block", "Rejoindre");
+  joinBtn.onclick = () => {
+    const av = DUEL.getCharacter();
+    const code = codeInp.value.trim().toUpperCase();
+    if (!code) { msg.textContent = "Entre le code de ton ami."; return; }
+    joinBtn.disabled = true; msg.textContent = "Connexion…";
+    DUEL.joinRoom(code, av, (ok, err) => {
+      joinBtn.disabled = false;
+      if (!ok) { msg.textContent = err || "Échec de la connexion."; return; }
+      DUEL_UI.mode = "online";
+      DUEL_UI.avatar = av; DUEL_UI.mySeat = "B"; DUEL_UI.code = code; DUEL_UI.isHost = false;
+      duelDrawWaiting();
+    });
+  };
+  b.appendChild(joinBtn);
+  b.appendChild(msg);
+}
+
+function duelDrawSearching() {
+  const b = $("duel-lobby-body");
+  b.innerHTML = "";
+  b.appendChild(el("h2", "create-title", "Recherche…"));
+  b.appendChild(el("p", "duel-msg", "On cherche un adversaire disponible. Ça peut prendre un moment si personne d'autre n'est en ligne."));
+  const cancelBtn = el("button", "btn btn-quiet btn-block", "Annuler");
+  cancelBtn.onclick = () => { DUEL.leaveQueue(); worldDrawHome(); };
+  b.appendChild(cancelBtn);
+}
+
+let DUEL_LB_REF = null;
+
+function duelOpenLeaderboard() {
+  show("screen-duel-leaderboard");
+  const box = $("duel-leaderboard-body");
+  box.innerHTML = "";
+  if (!DUEL.ready()) {
+    box.appendChild(el("div", "empty-note", "Le duel en direct n'est pas encore configuré sur ce site."));
+    return;
+  }
+  box.appendChild(el("div", "empty-note", "Chargement…"));
+  if (DUEL_LB_REF) { DUEL_LB_REF.off(); DUEL_LB_REF = null; }
+  DUEL.ensureAuth(() => {
+    DUEL_LB_REF = DUEL.listenLeaderboard((rows) => {
+      box.innerHTML = "";
+      if (!rows.length) {
+        box.appendChild(el("div", "empty-note", "Personne au classement pour l'instant. Sois le premier à jouer."));
+        return;
+      }
+      rows.forEach((r, i) => {
+        const row = el("div", "pan-row");
+        row.appendChild(el("div", "pan-score", String(r.rating != null ? r.rating : 0)));
+        const mid = el("div");
+        mid.appendChild(el("div", "pan-name", (i + 1) + ". " + (r.name || "Joueur")));
+        mid.appendChild(el("div", "pan-sub", `${r.wins || 0} victoires · ${r.losses || 0} défaites`));
+        row.appendChild(mid);
+        box.appendChild(row);
+      });
+    });
+  });
+}
+
+function duelDrawWaiting() {
+  const b = $("duel-lobby-body");
+  b.innerHTML = "";
+  b.appendChild(el("h2", "create-title", "Salon " + DUEL_UI.code));
+  if (DUEL_UI.isHost) {
+    b.appendChild(el("p", "duel-msg", "Partage ce code avec ton ami :"));
+    b.appendChild(el("div", "duel-code-big", DUEL_UI.code));
+  } else {
+    b.appendChild(el("p", "duel-msg", "Connecté au salon de ton ami."));
+  }
+
+  const seatsBox = el("div", "duel-seats");
+  b.appendChild(seatsBox);
+
+  const readyBtn = el("button", "btn btn-accent btn-block", "Je suis prêt");
+  readyBtn.onclick = () => {
+    DUEL.markReady(); readyBtn.disabled = true; readyBtn.textContent = "En attente de l'adversaire…";
+  };
+  b.appendChild(readyBtn);
+
+  const backBtn = el("button", "btn btn-quiet btn-block", "Annuler");
+  backBtn.onclick = () => { duelReset(); show("screen-duel-lobby"); worldDrawHome(); };
+  b.appendChild(backBtn);
+
+  DUEL.listenSeats((seats) => {
+    seatsBox.innerHTML = "";
+    ["A", "B"].forEach((s) => {
+      const seat = seats[s];
+      const row = el("div", "duel-seat-row" + (seat && seat.ready ? " ready" : ""));
+      row.appendChild(el("span", "duel-seat-name", seat ? seat.name : "En attente…"));
+      row.appendChild(el("span", "duel-seat-ovr", seat ? "OVR " + seat.ovr : ""));
+      row.appendChild(el("span", "duel-seat-state", seat ? (seat.ready ? "Prêt" : "…") : ""));
+      seatsBox.appendChild(row);
+    });
+  });
+
+  DUEL.listenRoom((room) => duelOnRoomChange(room));
+}
+
+/* Une fois le salon « live », chacun démarre sa propre série de
+   situations et ne dépend plus jamais de l'autre pour avancer —
+   seul le tableau des scores et le chrono sont partagés. */
+function duelOnRoomChange(room) {
+  if (!DUEL_UI || DUEL_UI.enteredLive) return;
+  if (room.status !== "live") return;
+  DUEL_UI.enteredLive = true;
+  DUEL_UI.competition = "regular";
+  DUEL_UI.roundsTotal = DUEL.ROUNDS_REGULAR;
+  const otherSeat = DUEL_UI.mySeat === "A" ? "B" : "A";
+  const theirs = DUEL.seatsCache[otherSeat] || {};
+  duelShowScoutingThen(theirs.name || "l'adversaire", theirs.attrs, () => {
+    show("screen-duel-live");
+    duelRenderScorebugShell();
+    DUEL.startMyRun(DUEL_UI.avatar.position, DUEL.signatureUsesForCharacter(DUEL_UI.avatar));
+    DUEL_UI.oppProgress = { score: 0, count: 0 };
+    DUEL.listenProgress((progress) => duelOnProgressChange(progress));
+  });
+}
+
+/* ─── démarrage d'un match contre une IA locale (mode Saison) ───
+   Aucun salon Firebase : le côté adverse est calculé sur place, round
+   par round, avec la même DUEL.resolveChoice qu'un vrai joueur. */
+function worldStartAiMatch(aiAttrs, aiName, onDone, competition) {
+  duelReset();
+  DUEL_UI.mode = "ai";
+  DUEL_UI.competition = competition === "playoffs" ? "playoffs" : "regular";
+  DUEL_UI.roundsTotal = DUEL_UI.competition === "playoffs" ? DUEL.ROUNDS_PLAYOFFS : DUEL.ROUNDS_REGULAR;
+  DUEL_UI.avatar = DUEL.getCharacter();
+  DUEL_UI.aiAttrs = aiAttrs;
+  DUEL_UI.aiName = aiName;
+  DUEL_UI.aiOnDone = onDone;
+  DUEL_UI.mySeat = "A";
+  DUEL_UI.enteredLive = true;
+  show("screen-duel-live");
+  duelRenderScorebugShell();
+  const sc = DUEL.pickScenario(DUEL_UI.avatar.position);
+  const tell = DUEL.pickTell();
+  DUEL_UI.myProgress = { score: 0, count: 0, scenarioId: sc.id, tellId: tell.id, lastOutcome: null,
+    momentum: 0, lastMech: null, mechStreak: 0, sigUsesLeft: DUEL.signatureUsesForCharacter(DUEL_UI.avatar) };
+  DUEL_UI.oppProgress = { score: 0, count: 0 };
+  duelUpdateScoreDisplay();
+  duelRenderMySituation();
+}
+
+function duelRenderScorebugShell() {
+  const sb = $("duel-scorebug");
+  sb.innerHTML = "";
+  const mineName = DUEL_UI.mode === "ai" ? ENG.name(DUEL_UI.avatar)
+    : ((DUEL.seatsCache[DUEL_UI.mySeat] && DUEL.seatsCache[DUEL_UI.mySeat].name) || "Toi");
+  const theirsName = DUEL_UI.mode === "ai" ? DUEL_UI.aiName
+    : ((DUEL.seatsCache[DUEL_UI.mySeat === "A" ? "B" : "A"] && DUEL.seatsCache[DUEL_UI.mySeat === "A" ? "B" : "A"].name) || "Adversaire");
+
+  const mineEl = el("div", "duel-sb-side");
+  const mineNameRow = el("div", "duel-sb-name-row");
+  mineNameRow.appendChild(el("span", "duel-sb-name", mineName));
+  const mineFire = el("span", "duel-fire-tag hidden", "🔥"); mineFire.id = "duel-my-fire";
+  mineNameRow.appendChild(mineFire);
+  mineEl.appendChild(mineNameRow);
+  const myScoreEl = el("div", "duel-sb-score", "0"); myScoreEl.id = "duel-my-score";
+  mineEl.appendChild(myScoreEl);
+
+  const mid = el("div", "duel-sb-mid", "0 / " + DUEL_UI.roundsTotal); mid.id = "duel-round-counter";
+
+  const theirsEl = el("div", "duel-sb-side");
+  const theirsNameRow = el("div", "duel-sb-name-row");
+  theirsNameRow.appendChild(el("span", "duel-sb-name", theirsName));
+  const theirsFire = el("span", "duel-fire-tag hidden", "🔥"); theirsFire.id = "duel-opp-fire";
+  theirsNameRow.appendChild(theirsFire);
+  theirsEl.appendChild(theirsNameRow);
+  const oppScoreEl = el("div", "duel-sb-score", "0"); oppScoreEl.id = "duel-opp-score";
+  theirsEl.appendChild(oppScoreEl);
+
+  sb.appendChild(mineEl); sb.appendChild(mid); sb.appendChild(theirsEl);
+
+  const quitBtn = el("button", "btn-icon duel-quit", "✕");
+  quitBtn.setAttribute("aria-label", "Abandonner");
+  quitBtn.onclick = () => {
+    ask({
+      kicker: "Abandonner", head: "Quitter ce match ?",
+      body: "Ça compte comme une défaite immédiate.",
+      chain: false,
+      choices: [
+        { h: "Non, continuer", d: "", t: "", pick: () => setActionEnabled(true) },
+        { h: "Oui, abandonner", d: "", t: "", danger: true, pick: () => { setActionEnabled(true); duelAbandon(); } },
+      ],
+    });
+  };
+  sb.appendChild(quitBtn);
+
+  const strip = $("duel-status-strip");
+  strip.innerHTML = "";
+  const commentEl = el("div", "duel-commentator", "C'est parti !"); commentEl.id = "duel-commentator";
+  strip.appendChild(commentEl);
+  if (DUEL_UI.competition === "playoffs") {
+    const crowdWrap = el("div", "duel-crowd");
+    const crowdFill = el("div", "duel-crowd-fill"); crowdFill.id = "duel-crowd-fill";
+    crowdWrap.appendChild(crowdFill);
+    strip.appendChild(crowdWrap);
+  }
+
+  $("duel-feed").innerHTML = "";
+}
+
+function duelRenderFeed() {
+  const box = $("duel-feed");
+  if (!box) return;
+  box.innerHTML = "";
+  (DUEL_UI.feed || []).forEach((line) => box.appendChild(el("div", "duel-feed-line", line)));
+}
+
+let DUEL_TAUNT_H = null;
+function duelShowTauntBanner(text) {
+  const strip = $("duel-status-strip");
+  if (!strip) return;
+  strip.querySelectorAll(".duel-taunt-banner").forEach((x) => x.remove());
+  const banner = el("div", "duel-taunt-banner", text);
+  strip.appendChild(banner);
+  if (DUEL_TAUNT_H) clearTimeout(DUEL_TAUNT_H);
+  DUEL_TAUNT_H = setTimeout(() => { banner.remove(); }, 3500);
+}
+
+/* Abandon volontaire (bouton ✕) : compte comme une défaite immédiate.
+   Pour un match en ligne, l'adversaire n'est pas coupé de force — il
+   verra simplement un score qui ne bouge plus de mon côté. */
+function duelAbandon() {
+  if (!DUEL_UI || DUEL_UI.ended) return;
+  DUEL_UI.ended = true;
+  duelClearCountdown();
+  DUEL.recordResult(false, false);
+  if (DUEL_UI.mode === "ai") {
+    const onDone = DUEL_UI.aiOnDone;
+    duelReset();
+    if (onDone) onDone(false, false, 0, 0);
+  } else {
+    DUEL.deleteRoom(DUEL_UI.code);
+    duelReset();
+    show("screen-duel-lobby");
+    worldDrawHome();
+  }
+}
+
+function duelUpdateScoreDisplay() {
+  const mine = DUEL_UI.myProgress, theirs = DUEL_UI.oppProgress;
+  const myScoreEl = $("duel-my-score"); if (myScoreEl && mine) myScoreEl.textContent = String(mine.score || 0);
+  const oppScoreEl = $("duel-opp-score"); if (oppScoreEl && theirs) oppScoreEl.textContent = String(theirs.score || 0);
+  const mid = $("duel-round-counter");
+  if (mid && mine) mid.textContent = Math.min(mine.count, DUEL_UI.roundsTotal) + " / " + DUEL_UI.roundsTotal;
+
+  const myFire = $("duel-my-fire");
+  if (myFire) myFire.classList.toggle("hidden", !(mine && (mine.momentum || 0) >= 2));
+  const oppFire = $("duel-opp-fire");
+  if (oppFire) oppFire.classList.toggle("hidden", !(theirs && (theirs.momentum || 0) >= 2));
+
+  const commentEl = $("duel-commentator");
+  if (commentEl && mine) {
+    commentEl.textContent = DUEL.commentatorLine(mine.score || 0, (theirs && theirs.score) || 0, mine.count, DUEL_UI.roundsTotal);
+  }
+
+  const crowdFill = $("duel-crowd-fill");
+  if (crowdFill && mine) {
+    const heat = ENG.clamp((((mine.momentum || 0) + ((theirs && theirs.momentum) || 0)) + 3) / 6 * 100, 8, 100);
+    crowdFill.style.width = heat + "%";
+  }
+}
+
+function duelOnProgressChange(progress) {
+  if (!DUEL_UI || DUEL_UI.ended || DUEL_UI.mode !== "online") return;
+  const otherSeat = DUEL_UI.mySeat === "A" ? "B" : "A";
+  const mine = progress[DUEL_UI.mySeat];
+  const theirs = progress[otherSeat];
+
+  if (theirs && (!DUEL_UI.oppProgress || DUEL_UI.oppProgress.count !== theirs.count) && theirs.lastOutcome) {
+    DUEL_UI.feed = (DUEL_UI.feed || []).concat(theirs.lastOutcome.headline || "…").slice(-4);
+    duelRenderFeed();
+  }
+  if (theirs && theirs.taunt && (!DUEL_UI.oppProgress || !DUEL_UI.oppProgress.taunt || DUEL_UI.oppProgress.taunt.at !== theirs.taunt.at)) {
+    duelShowTauntBanner(theirs.taunt.text);
+  }
+  DUEL_UI.oppProgress = theirs || DUEL_UI.oppProgress;
+
+  const isNew = mine && (!DUEL_UI.myProgress || DUEL_UI.myProgress.count !== mine.count);
+  if (isNew && mine.lastOutcome && !mine.lastOutcome.success) DUEL_UI.perfect = false;
+  if (mine) DUEL_UI.myProgress = mine;
+  duelUpdateScoreDisplay();
+
+  if (isNew) {
+    const half = DUEL_UI.roundsTotal / 2;
+    const willHalftime = !DUEL_UI.halfShown && mine.count === half;
+    duelRenderMySituation(willHalftime);
+    if (willHalftime) { DUEL_UI.halfShown = true; duelShowHalftime(mine); }
+  }
+
+  if (mine && mine.count >= DUEL_UI.roundsTotal && theirs && theirs.count >= DUEL_UI.roundsTotal) {
+    setTimeout(duelEndMatch, 1200);
+  }
+}
+
+let DUEL_COUNTDOWN_H = null;
+function duelClearCountdown() {
+  if (DUEL_COUNTDOWN_H) { clearInterval(DUEL_COUNTDOWN_H); DUEL_COUNTDOWN_H = null; }
+}
+
+/* Mi-temps : un choix à faible enjeu qui ajuste légèrement les
+   chances pour la seconde moitié — réutilise ask(), pas un nouvel
+   écran HTML. `mine` sert juste à afficher le score au moment de la
+   pause. */
+function duelShowHalftime(mine) {
+  const theirScore = DUEL_UI.oppProgress ? (DUEL_UI.oppProgress.score || 0) : 0;
+  ask({
+    kicker: "Mi-temps", head: `${mine.score} – ${theirScore}`,
+    body: "Un ajustement pour la seconde moitié :",
+    chain: false,
+    choices: [
+      { h: "Resserrer la défense", d: "Un jeu plus posé, moins d'erreurs.", t: "Bonus stable",
+        pick: () => { setActionEnabled(true); DUEL_UI.halfBonus = 0.03; DUEL_UI.halfBonusMechs = null; duelRenderMySituation(); } },
+      { h: "Accélérer le rythme", d: "Plus de tirs et de pénétrations tentés.", t: "Bonus offensif",
+        pick: () => { setActionEnabled(true); DUEL_UI.halfBonus = 0.06; DUEL_UI.halfBonusMechs = ["shoot", "drive"]; duelRenderMySituation(); } },
+    ],
+  });
+}
+
+/* skipNext : quand la mi-temps va s'afficher juste après, on montre
+   le résultat de la dernière action mais pas encore la suivante — la
+   modale de mi-temps rappelle duelRenderMySituation() une fois le
+   choix fait, cette fois sans skipNext. */
+function duelRenderMySituation(skipNext) {
+  duelClearCountdown();
+  const arena = $("duel-arena");
+  const mine = DUEL_UI.myProgress;
+  if (!mine) return;
+  const sc = DUEL.LIB.find((t) => t.id === mine.scenarioId) || DUEL.LIB[0];
+  const framing = sc.clutchWeighted ? "clutch" : null;
+
+  arena.innerHTML = "";
+
+  if (mine.lastOutcome) {
+    const panel = el("div", "manga-panel-wrap");
+    panel.innerHTML = MANGA.compose(mine.lastOutcome, { offChoice: mine.lastOutcome.mech, framing });
+    arena.appendChild(panel);
+    const card = el("div", "duel-outcome");
+    card.appendChild(el("div", "duel-outcome-who", mine.lastOutcome.choiceH));
+    card.appendChild(el("div", "duel-outcome-headline", mine.lastOutcome.headline));
+    card.appendChild(el("div", "duel-outcome-body", mine.lastOutcome.text));
+    arena.appendChild(card);
+
+    if (DUEL_UI.mode === "online" && mine.lastOutcome.success) {
+      DUEL_UI.tauntSentThisRound = false;
+      const tauntBox = el("div", "duel-taunts");
+      DUEL.TAUNTS.forEach((text) => {
+        const tbtn = el("button", "duel-taunt-btn", text);
+        tbtn.onclick = () => {
+          if (DUEL_UI.tauntSentThisRound) return;
+          DUEL_UI.tauntSentThisRound = true;
+          DUEL.sendTaunt(text);
+          tauntBox.querySelectorAll(".duel-taunt-btn").forEach((x) => { x.disabled = true; });
+        };
+        tauntBox.appendChild(tbtn);
+      });
+      arena.appendChild(tauntBox);
+    }
+  }
+
+  if (skipNext) return;
+
+  if (mine.count >= DUEL_UI.roundsTotal) {
+    arena.appendChild(el("p", "duel-msg", "Match terminé — calcul du résultat…"));
+    return;
+  }
+
+  const panel = el("div", "manga-panel-wrap");
+  panel.innerHTML = MANGA.composeSetup({ framing, label: sc.head });
+  arena.appendChild(panel);
+
+  const tell = DUEL.TELLS.find((t) => t.id === mine.tellId);
+  if (tell && tell.favors) arena.appendChild(el("div", "duel-tell", "👁 " + tell.label));
+
+  const card = el("div", "duel-situation");
+  card.appendChild(el("div", "duel-situation-kicker", "Situation " + (mine.count + 1) + " / " + DUEL_UI.roundsTotal));
+  card.appendChild(el("div", "duel-situation-head", sc.head));
+  card.appendChild(el("div", "duel-situation-body", sc.body));
+  arena.appendChild(card);
+
+  if ((mine.mechStreak || 0) >= 2 && mine.lastMech) {
+    arena.appendChild(el("p", "duel-fatigue-note", "Fatigue : à force de répéter le même choix, son efficacité baisse."));
+  }
+
+  const timeEl = el("div", "duel-countdown", String(DUEL.CHOICE_SECONDS));
+  arena.appendChild(timeEl);
+
+  const choiceBox = el("div", "modal-choices");
+  let answered = false;
+  const lockChoices = () => choiceBox.querySelectorAll(".choice").forEach((x) => { x.disabled = true; x.style.opacity = .5; });
+  const halfBonusFor = (mech) => (DUEL_UI.halfBonus && (!DUEL_UI.halfBonusMechs || DUEL_UI.halfBonusMechs.includes(mech))) ? DUEL_UI.halfBonus : 0;
+
+  sc.ch.forEach((c, idx) => {
+    const btn = el("button", "choice");
+    btn.appendChild(el("div", "choice-h", c.h));
+    if (c.d) btn.appendChild(el("div", "choice-d", c.d));
+    if (c.t) btn.appendChild(el("div", "choice-t", "→ " + c.t));
+    btn.onclick = () => {
+      if (answered) return;
+      answered = true;
+      duelClearCountdown();
+      lockChoices();
+      duelSubmitChoice(idx, halfBonusFor(c.mech), false);
+    };
+    choiceBox.appendChild(btn);
+  });
+
+  if ((mine.sigUsesLeft || 0) > 0) {
+    const sigMech = DUEL.bestMech(DUEL_UI.avatar.attrs);
+    const sigBtn = el("button", "choice choice-signature");
+    sigBtn.appendChild(el("div", "choice-h", "🌟 Coup signature"));
+    sigBtn.appendChild(el("div", "choice-d", "Ton geste fétiche, un net avantage."));
+    sigBtn.appendChild(el("div", "choice-t", "→ " + mine.sigUsesLeft + " restant(s)"));
+    sigBtn.onclick = () => {
+      if (answered) return;
+      answered = true;
+      duelClearCountdown();
+      lockChoices();
+      const idx = sc.ch.findIndex((c) => c.mech === sigMech);
+      duelSubmitChoice(idx >= 0 ? idx : 0, halfBonusFor(sigMech), true);
+    };
+    choiceBox.appendChild(sigBtn);
+  }
+
+  arena.appendChild(choiceBox);
+
+  let remain = DUEL.CHOICE_SECONDS;
+  DUEL_COUNTDOWN_H = setInterval(() => {
+    remain--;
+    timeEl.textContent = String(Math.max(0, remain));
+    if (remain <= 0) {
+      duelClearCountdown();
+      if (answered) return;
+      answered = true;
+      lockChoices();
+      duelSubmitTimeout();
+    }
+  }, 1000);
+}
+
+function duelSubmitChoice(idx, extraBonus, useSignature) {
+  if (DUEL_UI.mode === "ai") aiApplyMyRound(idx, extraBonus, useSignature);
+  else DUEL.submitMyChoice(idx, DUEL_UI.avatar.attrs, DUEL_UI.avatar.position, useSignature, extraBonus);
+}
+
+function duelSubmitTimeout() {
+  if (DUEL_UI.mode === "ai") aiApplyMyRound(null, 0, false);
+  else DUEL.submitTimeout(DUEL_UI.avatar.position);
+}
+
+/* ─── résolution locale d'un round contre l'IA ───
+   Mon choix (ou l'absence de choix) se résout avec DUEL.resolveChoice,
+   exactement comme un vrai joueur — même lecture de défense, momentum,
+   fatigue et coup signature que le chemin en ligne (DUEL.submitMyChoice),
+   juste sans salon Firebase. L'IA joue son propre round au même rythme,
+   résolu simplement (pas de tell/momentum de son côté). */
+function aiApplyMyRound(idx, extraBonus, useSignature) {
+  const mine = DUEL_UI.myProgress;
+  const sc = DUEL.LIB.find((t) => t.id === mine.scenarioId) || DUEL.LIB[0];
+  const choice = idx != null ? (sc.ch[idx] || sc.ch[0]) : null;
+  const tell = DUEL.TELLS.find((t) => t.id === mine.tellId) || null;
+
+  let outcome;
+  if (choice) {
+    const bonus = DUEL.deriveBonus(mine, tell, choice.mech, useSignature) + (extraBonus || 0);
+    outcome = DUEL.resolveChoice(sc, choice.mech, DUEL_UI.avatar.attrs, !!sc.clutchWeighted, bonus);
+    if (useSignature) outcome = DUEL.applySignatureFlavor(outcome);
+  } else {
+    outcome = { points: 0, success: false, headline: "Temps écoulé",
+      text: "L'horloge tourne trop vite, l'occasion est passée.", flags: { turnover: true } };
+  }
+  if (!outcome.success) DUEL_UI.perfect = false;
+
+  const nextSc = DUEL.pickScenario(DUEL_UI.avatar.position);
+  const nextTell = DUEL.pickTell();
+  const newCount = mine.count + 1;
+  DUEL_UI.myProgress = {
+    score: mine.score + (outcome.points || 0),
+    count: newCount,
+    scenarioId: nextSc.id,
+    tellId: nextTell.id,
+    lastOutcome: Object.assign({}, outcome, {
+      scenarioId: mine.scenarioId, choiceH: choice ? choice.h : "—", mech: choice ? choice.mech : null }),
+    momentum: DUEL.nextMomentum(mine, outcome.success),
+    lastMech: choice ? choice.mech : null,
+    mechStreak: choice ? DUEL.nextMechStreak(mine, choice.mech) : 0,
+    sigUsesLeft: Math.max(0, (mine.sigUsesLeft || 0) - (useSignature ? 1 : 0)),
+  };
+
+  const aiSc = DUEL.pickScenario();
+  const aiChoice = ENG.R.pick(aiSc.ch);
+  const aiOutcome = DUEL.resolveChoice(aiSc, aiChoice.mech, DUEL_UI.aiAttrs, !!aiSc.clutchWeighted, 0);
+  DUEL_UI.oppProgress = { score: (DUEL_UI.oppProgress.score || 0) + (aiOutcome.points || 0), count: newCount };
+
+  duelUpdateScoreDisplay();
+
+  const half = DUEL_UI.roundsTotal / 2;
+  const willHalftime = !DUEL_UI.halfShown && newCount === half;
+  duelRenderMySituation(willHalftime);
+  if (willHalftime) { DUEL_UI.halfShown = true; duelShowHalftime(DUEL_UI.myProgress); }
+
+  if (newCount >= DUEL_UI.roundsTotal) setTimeout(duelEndMatch, 1200);
+}
+
+function duelEndMatch() {
+  if (!DUEL_UI || DUEL_UI.ended) return;
+  DUEL_UI.ended = true;
+  duelClearCountdown();
+  duelShowResult();
+}
+
+function duelCheckPerfectBadge(won) {
+  if (!won || !DUEL_UI.perfect) return;
+  const c = DUEL.getCharacter();
+  if (c && DUEL.awardBadge(c, "perfect", "Sans-faute")) DUEL.setCharacter(c);
+}
+
+function duelShowResult() {
+  const myScore = (DUEL_UI.myProgress && DUEL_UI.myProgress.score) || 0;
+  const oppScore = (DUEL_UI.oppProgress && DUEL_UI.oppProgress.score) || 0;
+  const won = myScore > oppScore, tie = myScore === oppScore;
+  duelCheckPerfectBadge(won);
+
+  if (DUEL_UI.mode === "ai") {
+    DUEL.recordResult(won, tie);
+    const onDone = DUEL_UI.aiOnDone;
+    duelReset();
+    if (onDone) onDone(won, tie, myScore, oppScore);
+    return;
+  }
+
+  const seats = DUEL.seatsCache;
+  const otherSeat = DUEL_UI.mySeat === "A" ? "B" : "A";
+  const myName = (seats[DUEL_UI.mySeat] && seats[DUEL_UI.mySeat].name) || "Toi";
+  const oppName = (seats[otherSeat] && seats[otherSeat].name) || "Adversaire";
+
+  DUEL.saveHistory({ at: Date.now(), code: DUEL_UI.code, opponent: oppName, won, tie, myScore, oppScore });
+  DUEL.recordResult(won, tie);
+
+  show("screen-duel-result");
+  const shell = $("duel-result-shell");
+  shell.innerHTML = "";
+  const hero = el("div", "end-hero");
+  hero.appendChild(el("div", "end-verdict", won ? "Victoire !" : tie ? "Match nul" : "Défaite"));
+  hero.appendChild(el("div", "end-name", `${myName} ${myScore} – ${oppScore} ${oppName}`));
+  shell.appendChild(hero);
+
+  const again = el("button", "btn btn-accent btn-block", "Retour au monde multijoueur");
+  again.onclick = () => { DUEL.deleteRoom(DUEL_UI.code); duelOpenLobby(); };
+  shell.appendChild(again);
+
+  const home = el("button", "btn btn-quiet btn-block", "Retour à l'accueil");
+  home.onclick = () => { DUEL.deleteRoom(DUEL_UI.code); duelReset(); show("screen-boot"); };
+  shell.appendChild(home);
+}
+
+/* ═══════════════ MODE SAISON ═══════════════
+   Personnage MP, sa propre franchise, un calendrier de conférence joué
+   contre des adversaires IA (mêmes mécaniques que Ami/Aléatoire), puis
+   des playoffs joués au meilleur des trois. Couche à part : ne touche
+   ni ENG.simSeason ni la carrière solo. */
+
+function worldTeamStrength(teamId) {
+  const t = teamOf(teamId);
+  return (t && t.prestige) || 60;
+}
+
+/* Résolution instantanée (bouton "Simuler") : même esprit que la
+   difficulté IA (ENG.worldAiAttrs), mais réduite à une seule
+   probabilité au lieu de 8 situations jouées. */
+function worldSimulateWinProb(c, oppTeam) {
+  const myOvr = ENG.ovr(c);
+  const aiCenter = ENG.clamp(28 + (oppTeam.prestige || 60) * 0.5, 25, 78);
+  return ENG.clamp(0.5 + (myOvr - aiCenter) * 0.02, 0.15, 0.85);
+}
+
+function worldOpenSeason() {
+  const c = DUEL.getCharacter();
+  if (!c) { worldDrawCreateCharacter(); return; }
+  if (!c.season || c.season.stage === "done") worldDrawTeamPicker();
+  else worldDrawSeasonScreen();
+}
+
+function worldDrawTeamPicker() {
+  show("screen-duel-lobby");
+  const b = $("duel-lobby-body");
+  b.innerHTML = "";
+  b.appendChild(el("h2", "create-title", "Choisis ta franchise"));
+  b.appendChild(el("p", "duel-msg", "Deux matchs contre chaque équipe de ta conférence, puis des playoffs au meilleur des trois."));
+
+  [["E", "Conférence Est"], ["O", "Conférence Ouest"]].forEach(([conf, label]) => {
+    b.appendChild(el("div", "duel-or", label));
+    const grid = el("div", "opts cols-2");
+    DATA.TEAMS.filter((t) => t.conf === conf).forEach((t) => {
+      const btn = el("button", "opt");
+      btn.type = "button";
+      btn.appendChild(el("div", "opt-h", t.full));
+      btn.onclick = () => worldStartNewSeason(t.id);
+      grid.appendChild(btn);
+    });
+    b.appendChild(grid);
+  });
+
+  const cancelBtn = el("button", "btn btn-quiet btn-block", "Annuler");
+  cancelBtn.onclick = () => worldDrawHome();
+  b.appendChild(cancelBtn);
+}
+
+function worldStartNewSeason(teamId) {
+  const c = DUEL.getCharacter();
+  c.teamId = teamId;
+  c.season = { teamId, schedule: ENG.worldBuildSchedule(teamId), wins: 0, losses: 0, stage: "regular", bracket: null, resultText: null };
+  DUEL.setCharacter(c);
+  worldDrawSeasonScreen();
+}
+
+function worldDrawSeasonScreen() {
+  show("screen-world-season");
+  const c = DUEL.getCharacter();
+  const s = c.season;
+  if (s.stage === "regular" && !s.schedule.some((g) => !g.played)) worldFinishRegularSeason(c, s);
+  if (s.stage === "playoffs") worldAdvancePlayoffs(c, s);
+
+  const myTeam = teamOf(s.teamId);
+  $("world-season-title").textContent = myTeam.full;
+  const box = $("world-season-body");
+  box.innerHTML = "";
+
+  if (s.stage === "regular") {
+    const remaining = s.schedule.filter((g) => !g.played);
+    const row = el("div", "pan-row");
+    row.appendChild(el("div", "pan-score", s.wins + "-" + s.losses));
+    const mid = el("div");
+    mid.appendChild(el("div", "pan-name", "Prochain match : " + teamOf(remaining[0].opp).full));
+    mid.appendChild(el("div", "pan-sub", remaining.length + " match(s) restant(s) cette saison"));
+    row.appendChild(mid);
+    box.appendChild(row);
+
+    const playBtn = el("button", "btn btn-accent btn-block", "Jouer ce match");
+    playBtn.onclick = () => worldPlayScheduleGame(c, remaining[0]);
+    box.appendChild(playBtn);
+
+    const simBtn = el("button", "btn btn-quiet btn-block", "Simuler");
+    simBtn.onclick = () => worldSimulateScheduleGame(c, remaining[0]);
+    box.appendChild(simBtn);
+
+    if (remaining.length > 1) {
+      box.appendChild(el("p", "duel-msg", "Ensuite : " + remaining.slice(1, 7).map((g) => teamOf(g.opp).full).join(" · ") + (remaining.length > 7 ? "…" : "")));
+    }
+  } else if (s.stage === "playoffs") {
+    worldRenderBracket(box, c, s);
+  } else if (s.stage === "done") {
+    box.appendChild(el("div", "empty-note", s.resultText || "Saison terminée."));
+    const newBtn = el("button", "btn btn-accent btn-block", "Nouvelle saison");
+    newBtn.onclick = () => worldDrawTeamPicker();
+    box.appendChild(newBtn);
+  }
+
+  const backBtn = el("button", "btn btn-quiet btn-block", "Retour au monde multijoueur");
+  backBtn.onclick = () => { show("screen-duel-lobby"); worldDrawHome(); };
+  box.appendChild(backBtn);
+}
+
+function worldPlayScheduleGame(c, slot) {
+  const oppTeam = teamOf(slot.opp);
+  const aiAttrs = ENG.worldAiAttrs(oppTeam);
+  duelShowScoutingThen(oppTeam.full, aiAttrs, () => {
+    worldStartAiMatch(aiAttrs, oppTeam.full, (won, tie) => {
+      const iWon = tie ? ENG.R.chance(0.5) : won;
+      slot.played = true;
+      slot.result = { won: iWon };
+      if (iWon) c.season.wins++; else c.season.losses++;
+      DUEL.setCharacter(c);
+      worldDrawSeasonScreen();
+    }, "regular");
+  });
+}
+
+function worldSimulateScheduleGame(c, slot) {
+  const oppTeam = teamOf(slot.opp);
+  const won = ENG.R.chance(worldSimulateWinProb(c, oppTeam));
+  slot.played = true;
+  slot.result = { won, simulated: true };
+  if (won) c.season.wins++; else c.season.losses++;
+  DUEL.recordResult(won, false);
+  DUEL.setCharacter(c);
+  worldDrawSeasonScreen();
+}
+
+/* Bascule vers les playoffs si la conférence est qualifiée, sinon la
+   saison s'arrête ici — pure mutation d'état, appelée avant le rendu. */
+function worldFinishRegularSeason(c, s) {
+  const standings = ENG.worldConferenceStandings(s.teamId, s.wins, s.schedule.length);
+  const top8 = standings.slice(0, 8);
+  if (top8.findIndex((r) => r.id === s.teamId) < 0) {
+    s.stage = "done";
+    s.resultText = `Saison terminée : ${s.wins} V — ${s.losses} D. Ton équipe ne finit pas dans le top 8 de la conférence, pas de playoffs cette fois.`;
+    DUEL.setCharacter(c);
+    return;
+  }
+  s.stage = "playoffs";
+  s.bracket = worldBuildBracket(top8, s.teamId);
+  DUEL.setCharacter(c);
+}
+
+function worldBuildBracket(top8, myTeamId) {
+  const pairIdx = [[0, 7], [3, 4], [2, 5], [1, 6]];
+  const series = pairIdx.map(([a, b]) => {
+    const aId = top8[a].id, bId = top8[b].id;
+    return { aId, bId, aWins: 0, bWins: 0, involvesMe: aId === myTeamId || bId === myTeamId, done: false, winnerId: null };
+  });
+  return { round: 1, series };
+}
+
+function worldResolveSeriesInstant(series) {
+  const strA = worldTeamStrength(series.aId), strB = worldTeamStrength(series.bId);
+  const res = ENG.worldSeriesWin(strA, strB, 0);
+  const parts = res.score.split("-").map(Number);
+  series.aWins = parts[0]; series.bWins = parts[1];
+  series.done = true;
+  series.winnerId = res.win ? series.aId : series.bId;
+}
+
+function worldSeriesOpponent(c, series) {
+  const myTeamId = c.season.teamId;
+  const iAmA = series.aId === myTeamId;
+  return { iAmA, oppTeam: teamOf(iAmA ? series.bId : series.aId) };
+}
+
+function worldApplySeriesGameResult(c, series, iAmA, iWon) {
+  if (iAmA) { if (iWon) series.aWins++; else series.bWins++; }
+  else { if (iWon) series.bWins++; else series.aWins++; }
+  if (series.aWins >= 2 || series.bWins >= 2) {
+    series.done = true;
+    series.winnerId = series.aWins >= 2 ? series.aId : series.bId;
+  }
+  DUEL.setCharacter(c);
+  worldDrawSeasonScreen();
+}
+
+function worldPlaySeriesGame(c, series) {
+  const { iAmA, oppTeam } = worldSeriesOpponent(c, series);
+  const aiAttrs = ENG.worldAiAttrs(oppTeam);
+  duelShowScoutingThen(oppTeam.full, aiAttrs, () => {
+    worldStartAiMatch(aiAttrs, oppTeam.full, (won, tie) => {
+      const iWon = tie ? ENG.R.chance(0.5) : won;
+      worldApplySeriesGameResult(c, series, iAmA, iWon);
+    }, "playoffs");
+  });
+}
+
+function worldSimulateSeriesGame(c, series) {
+  const { iAmA, oppTeam } = worldSeriesOpponent(c, series);
+  const iWon = ENG.R.chance(worldSimulateWinProb(c, oppTeam));
+  DUEL.recordResult(iWon, false);
+  worldApplySeriesGameResult(c, series, iAmA, iWon);
+}
+
+const WORLD_ROUND_NAMES = { 1: "1er tour", 2: "Demi-finale de conférence", 3: "Finale de conférence" };
+
+/* Résout les séries qui ne me concernent pas et fait avancer le bracket
+   d'un round dès que tout est joué — pure mutation d'état, en boucle
+   jusqu'à ce qu'il ne reste plus qu'à attendre mon prochain match (ou
+   que la saison se termine). Jamais de rendu ici. */
+function worldAdvancePlayoffs(c, s) {
+  while (s.stage === "playoffs") {
+    const br = s.bracket;
+    let changed = false;
+    br.series.forEach((se) => { if (!se.done && !se.involvesMe) { worldResolveSeriesInstant(se); changed = true; } });
+
+    const mySeries = br.series.find((se) => se.involvesMe && !se.done);
+    if (mySeries) { if (changed) DUEL.setCharacter(c); return; }
+
+    const myTeamId = s.teamId;
+    const mySeriesDone = br.series.find((se) => se.involvesMe);
+    const iSurvived = !mySeriesDone || mySeriesDone.winnerId === myTeamId;
+    if (!iSurvived) {
+      s.stage = "done";
+      s.resultText = `Éliminé en playoffs (${WORLD_ROUND_NAMES[br.round]}). Saison terminée.`;
+      DUEL.setCharacter(c);
+      return;
+    }
+    if (br.round >= 3) {
+      s.stage = "done";
+      s.resultText = "Champion de conférence !";
+      DUEL.awardBadge(c, "conf-champ", "Champion de conférence");
+      DUEL.setCharacter(c);
+      return;
+    }
+    const winners = br.series.map((se) => se.winnerId);
+    const nextPairs = [[0, 1], [2, 3]];
+    const nextSeries = nextPairs.map(([a, b]) => ({
+      aId: winners[a], bId: winners[b], aWins: 0, bWins: 0,
+      involvesMe: winners[a] === myTeamId || winners[b] === myTeamId, done: false, winnerId: null,
+    }));
+    s.bracket = { round: br.round + 1, series: nextSeries };
+    DUEL.setCharacter(c);
+    /* la boucle continue : le round suivant peut lui-même se résoudre
+       entièrement d'un coup si je n'y suis pas impliqué */
+  }
+}
+
+function worldRenderBracket(box, c, s) {
+  const br = s.bracket;
+  box.appendChild(el("div", "empty-note", WORLD_ROUND_NAMES[br.round] || ("Round " + br.round)));
+
+  br.series.forEach((se) => {
+    const row = el("div", "pan-row");
+    row.appendChild(el("div", "pan-score", se.aWins + "-" + se.bWins));
+    const mid = el("div");
+    mid.appendChild(el("div", "pan-name", teamOf(se.aId).full + " vs " + teamOf(se.bId).full));
+    mid.appendChild(el("div", "pan-sub", se.done ? "Terminé" : se.involvesMe ? "En cours" : "…"));
+    row.appendChild(mid);
+    box.appendChild(row);
+  });
+
+  const mySeries = br.series.find((se) => se.involvesMe && !se.done);
+  if (mySeries) {
+    const playBtn = el("button", "btn btn-accent btn-block", "Jouer le prochain match de la série");
+    playBtn.onclick = () => worldPlaySeriesGame(c, mySeries);
+    box.appendChild(playBtn);
+
+    const simBtn = el("button", "btn btn-quiet btn-block", "Simuler");
+    simBtn.onclick = () => worldSimulateSeriesGame(c, mySeries);
+    box.appendChild(simBtn);
+  }
+}
+
 /* ═══════════════ ÉVÉNEMENTS DOM ═══════════════ */
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.body.insertAdjacentHTML("afterbegin", MANGA.DEFS_SVG);
   boot();
 
   /* Les boîtes de dialogue natives (confirm) sont bloquées dans une page
@@ -2515,9 +3520,14 @@ document.addEventListener("DOMContentLoaded", () => {
   $("btn-resume").onclick = resume;
   $("btn-pantheon").onclick = showPantheon;
   $("btn-mp").onclick = () => confirmReplace(() => mpSetup());
-  /* on n'attache pas showCodes directement : il recevrait l'événement
-     de clic comme message à afficher */
-  $("btn-codes").onclick = () => showCodes();
+  $("btn-duel").onclick = () => duelOpenLobby();
+  $("btn-duel-back").onclick = () => { duelReset(); S && S.p ? backToGame() : boot(); };
+  $("btn-duel-leaderboard-back").onclick = () => {
+    if (DUEL_LB_REF) { DUEL_LB_REF.off(); DUEL_LB_REF = null; }
+    show("screen-duel-lobby");
+    worldDrawHome();
+  };
+  $("btn-world-season-back").onclick = () => { show("screen-duel-lobby"); worldDrawHome(); };
 
   $("btn-menu").onclick = () => {
     if (!S || !S.p) { boot(); return; }
@@ -2530,8 +3540,6 @@ document.addEventListener("DOMContentLoaded", () => {
           pick: () => { setActionEnabled(true); } },
         { h: "Retour à l'accueil", d: "La carrière reste enregistrée, tu la retrouveras.", t: "Sauvegarde conservée",
           pick: () => { save(); boot(); } },
-        { h: "Mon code de carrière", d: "Le partager avec un ami.", t: "Codes de carrière",
-          pick: () => { showCodes(); } },
         { h: "Abandonner cette carrière", d: "Elle sera définitivement effacée.", t: "Action irréversible", danger: true,
           pick: () => {
             ask({
@@ -2549,7 +3557,6 @@ document.addEventListener("DOMContentLoaded", () => {
       ],
     });
   };
-  $("btn-codes-back").onclick = () => (S && S.p ? backToGame() : boot());
   $("btn-profile").onclick = () => showProfiles();
   $("btn-profile-back").onclick = () => boot();
 

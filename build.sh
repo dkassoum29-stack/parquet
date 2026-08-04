@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")"
 
-FILES="profile.js data.js engine.js meta.js cast.js scenarios.js app.js"
+FILES="profile.js data.js engine.js meta.js cast.js scenarios.js duel.js manga.js app.js"
 
 {
   echo "/* ═══════════════════════════════════════════════════════════"

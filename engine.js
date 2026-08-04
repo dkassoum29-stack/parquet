@@ -70,10 +70,13 @@ ENG.newPlayer = function (cfg) {
     attrs[a.id] = clamp(Math.round(attrs[a.id] + (w - 1.5) * 3.4), 30, 70);
   });
 
-  /* la culture basket du pays, puis l'origine, puis la mentalité */
+  /* la culture basket du pays, puis l'origine, puis la mentalité —
+     on ignore toute clé qui ne correspond à aucun attribut réel :
+     une entrée mal orthographiée dans data.js ne doit jamais
+     produire un NaN silencieux dans les attributs du joueur. */
   [nat.mods, origin.mods, ment.mods].forEach((mods) => {
     if (!mods) return;
-    for (const k in mods) attrs[k] = clamp(attrs[k] + mods[k], 25, 78);
+    for (const k in mods) { if (k in attrs) attrs[k] = clamp(attrs[k] + mods[k], 25, 78); }
   });
 
   /* le gabarit influence le corps */
@@ -464,6 +467,65 @@ ENG.standings = function (L, myTeamId, myWins) {
   byConf.O.forEach((r, i) => (r.seed = i + 1));
   return byConf;
 };
+
+/* ═══════════════ MONDE MULTIJOUEUR — mode Saison ═══════════════
+   Couche à part, indépendante de la carrière solo et de simSeason :
+   un personnage multijoueur choisit une franchise et joue contre des
+   adversaires IA dont la difficulté dérive de t.prestige (pas besoin
+   d'une ligue complète avec ses PNJ). */
+
+/* attributs synthétiques d'un adversaire IA, centrés sur la force de
+   son équipe — résolus ensuite avec la même DUEL.resolveChoice que pour
+   un vrai joueur, aucune nouvelle mécanique à inventer. */
+ENG.worldAiAttrs = function (team) {
+  const center = clamp(28 + (team.prestige || 60) * 0.5, 25, 78);
+  const attrs = {};
+  DATA.ATTRS.forEach((a) => { attrs[a.id] = clamp(Math.round(center + R.gauss(0, 6)), 25, 78); });
+  return attrs;
+};
+
+/* calendrier d'une saison multijoueur : deux matchs contre chaque
+   franchise de la même conférence, pas d'aller-retour inter-conférence. */
+ENG.worldBuildSchedule = function (myTeamId) {
+  const me = DATA.TEAMS.find((t) => t.id === myTeamId);
+  const slots = [];
+  DATA.TEAMS.forEach((t) => {
+    if (t.id === myTeamId || t.conf !== me.conf) return;
+    slots.push({ opp: t.id, played: false, result: null });
+    slots.push({ opp: t.id, played: false, result: null });
+  });
+  return R.shuffle(slots);
+};
+
+/* classement de conférence en fin de phase régulière : ton bilan réel
+   (tiré du calendrier joué) + un bilan simulé pour les autres équipes,
+   calé sur la même longueur de saison (pas 82 matchs). N'écrit jamais
+   dans ENG.standings ni dans une ligue de carrière solo. */
+ENG.worldConferenceStandings = function (myTeamId, myWins, gamesPerTeam) {
+  const me = DATA.TEAMS.find((t) => t.id === myTeamId);
+  const half = gamesPerTeam / 2;
+  const rows = DATA.TEAMS.filter((t) => t.conf === me.conf).map((t) => {
+    let w;
+    if (t.id === myTeamId) w = myWins;
+    else w = clamp(Math.round(half + ((t.prestige || 60) - 60) * (half / 60) + R.gauss(0, half * 0.18)), 2, gamesPerTeam - 2);
+    return { id: t.id, w, l: gamesPerTeam - w };
+  });
+  rows.sort((a, b) => b.w - a.w);
+  rows.forEach((r, i) => (r.seed = i + 1));
+  return rows;
+};
+
+/* série au meilleur des trois (au lieu de sept) — même logique que
+   seriesWin plus bas, juste un objectif de victoires plus court. */
+function worldSeriesWin(a, b, boost) {
+  const d = (a - b) * 0.075 + (boost || 0);
+  const pg = clamp(0.5 + d, 0.14, 0.86);
+  let wa = 0, wb = 0;
+  const games = [];
+  while (wa < 2 && wb < 2) { const win = R.chance(pg); games.push(win); if (win) wa++; else wb++; }
+  return { win: wa === 2, score: wa + "-" + wb, games };
+}
+ENG.worldSeriesWin = worldSeriesWin;
 
 function seriesWin(a, b, boost) {
   /* probabilité de gagner une série au meilleur des sept */

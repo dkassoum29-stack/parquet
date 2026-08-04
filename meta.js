@@ -27,28 +27,7 @@ META.blank = () => ({
   coachStyle: {},
   outcome: {},   /* "id:index:issue"     -> pour varier les issues aléatoires */
   lastCareers: [],
-  rivals: [],    /* joueurs importés par code : ils rejoignent chaque nouvelle ligue */
 });
-
-/* ─────────── rivaux importés ─────────── */
-
-META.addRival = function (o) {
-  const m = META.get();
-  m.rivals = m.rivals || [];
-  if (m.rivals.some((r) => r.n === o.n)) return false;   /* déjà présent */
-  m.rivals.push(o);
-  m.rivals = m.rivals.slice(-12);
-  META.flush();
-  return true;
-};
-
-META.removeRival = function (name) {
-  const m = META.get();
-  m.rivals = (m.rivals || []).filter((r) => r.n !== name);
-  META.flush();
-};
-
-META.getRivals = function () { return META.get().rivals || []; };
 
 META.load = function () {
   try {
