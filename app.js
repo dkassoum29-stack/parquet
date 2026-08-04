@@ -3084,6 +3084,12 @@ function duelRenderMySituation(skipNext) {
 
   arena.appendChild(choiceBox);
 
+  /* Sur petit écran, le récap de l'action précédente (panneau manga +
+     texte) pousse le compte à rebours hors de l'écran — sans ça, le
+     joueur perd un temps précieux à faire défiler avant de voir qu'il
+     doit choisir. On amène directement le chrono à l'écran. */
+  requestAnimationFrame(() => { timeEl.scrollIntoView({ behavior: "smooth", block: "start" }); });
+
   let remain = DUEL.CHOICE_SECONDS;
   DUEL_COUNTDOWN_H = setInterval(() => {
     remain--;

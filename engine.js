@@ -148,7 +148,7 @@ ENG.newPlayer = function (cfg) {
   return p;
 };
 
-ENG.name = (p) => p.first + " " + p.last;
+ENG.name = (p) => (p.first + " " + (p.last || "")).trim();
 
 ENG.ovr = function (p) {
   const w = DATA.POS_WEIGHTS[p.position];

@@ -1074,7 +1074,7 @@ ENG.newPlayer = function (cfg) {
   return p;
 };
 
-ENG.name = (p) => p.first + " " + p.last;
+ENG.name = (p) => (p.first + " " + (p.last || "")).trim();
 
 ENG.ovr = function (p) {
   const w = DATA.POS_WEIGHTS[p.position];
@@ -3556,7 +3556,7 @@ const DUEL = {};
 
 DUEL.ROUNDS_REGULAR = 10;
 DUEL.ROUNDS_PLAYOFFS = 12;
-DUEL.CHOICE_SECONDS = 10;
+DUEL.CHOICE_SECONDS = 15;
 DUEL.ROOT = "parquet_duels";
 
 /* ═══════════════ avatar rapide ═══════════════
@@ -3568,7 +3568,7 @@ DUEL.quickAvatar = function (name, positionId) {
   const pos = DATA.POSITIONS.find((p) => p.id === positionId) || DATA.POSITIONS[0];
   const cfg = {
     first: parts[0] || "Joueur",
-    last: parts.slice(1).join(" ") || "Anonyme",
+    last: parts.slice(1).join(" "),
     nation: ENG.R.pick(DATA.NATIONS).id,
     position: pos.id,
     height: ENG.R.i(pos.hMin, pos.hMax),
@@ -3751,6 +3751,360 @@ D_({ id: "c_paint_duel", w: 2, positions: ["C"],
     { h: "Mouvement de pivot", d: "La technique avant la force.", t: "Technique", mech: "shoot" },
     { h: "Forcer en puissance", d: "Imposer le rapport de force.", t: "Physique", mech: "drive" },
     { h: "Ressortir au shooteur", d: "Créer pour l'extérieur.", t: "Altruiste", mech: "pass" },
+  ] });
+
+/* ── situations universelles supplémentaires ── */
+
+D_({ id: "elbow_jumper", w: 2,
+  head: "Réception au coude",
+  body: "Le ballon arrive au coude, à mi-distance. La défense doit choisir entre sortir ou céder l'espace.",
+  ch: [
+    { h: "Tir immédiat", d: "La zone de confort.", t: "Direct", mech: "shoot" },
+    { h: "Pénétrer vers le cercle", d: "Une dribble suffit.", t: "Opportuniste", mech: "drive" },
+    { h: "Trouver le coupeur", d: "Lecture rapide du jeu.", t: "Collectif", mech: "pass" },
+  ] });
+
+D_({ id: "baseline_drive", w: 2,
+  head: "Attaque par la ligne de fond",
+  body: "Tu longes la ligne de fond, le défenseur colle mais l'angle est étroit pour lui.",
+  ch: [
+    { h: "Finir au cercle", d: "L'angle est serré pour lui.", t: "Engagé", mech: "drive" },
+    { h: "Tir en suspension", d: "Un retrait rapide.", t: "Technique", mech: "shoot" },
+    { h: "Ressortir au corner", d: "Un jeu plus large.", t: "Collectif", mech: "pass" },
+  ] });
+
+D_({ id: "zone_break", w: 2,
+  head: "Faille dans la zone",
+  body: "La défense de zone laisse un trou entre deux joueurs. Il faut décider vite avant qu'elle se referme.",
+  ch: [
+    { h: "Tir dans la faille", d: "Une fenêtre courte.", t: "Rapide", mech: "shoot" },
+    { h: "Pénétrer dans l'interstice", d: "Foncer avant que ça se ferme.", t: "Direct", mech: "drive" },
+    { h: "Faire circuler pour l'ouvrir", d: "Étirer encore la zone.", t: "Patient", mech: "pass" },
+  ] });
+
+D_({ id: "inbound_play", w: 1,
+  head: "Remise en jeu sous pression",
+  body: "Après le temps mort, il faut remettre le ballon en jeu avec un défenseur qui colle la ligne.",
+  ch: [
+    { h: "Chercher le tir rapide", d: "Profiter de la surprise.", t: "Audacieux", mech: "shoot" },
+    { h: "Couper vers le cercle", d: "S'engager tout de suite.", t: "Engagé", mech: "drive" },
+    { h: "Relancer proprement", d: "La sécurité d'abord.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "putback", w: 2,
+  head: "Rebond offensif",
+  body: "Le tir d'un partenaire rebondit sur l'arceau, tu es le mieux placé pour la deuxième chance.",
+  ch: [
+    { h: "Remettre au cercle", d: "Suivre son instinct.", t: "Immédiat", mech: "drive" },
+    { h: "Ressortir pour un tir propre", d: "Recomposer l'action.", t: "Technique", mech: "shoot" },
+    { h: "Redistribuer", d: "Chercher mieux placé.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "cross_court_kick", w: 2,
+  head: "Passe cross-court",
+  body: "Le ballon circule vite, un partenaire est seul de l'autre côté du terrain — si la passe arrive à temps.",
+  ch: [
+    { h: "Tir depuis ta position", d: "Ne pas attendre.", t: "Direct", mech: "shoot" },
+    { h: "Pénétrer pendant que ça bouge", d: "Profiter du désordre.", t: "Opportuniste", mech: "drive" },
+    { h: "Envoyer la passe cross-court", d: "Une grande fenêtre.", t: "Vision de jeu", mech: "pass" },
+  ] });
+
+D_({ id: "iso_wing", w: 2,
+  head: "Un contre un à l'aile",
+  body: "Ballon à l'aile, ton défenseur en position basse, prêt à réagir dans les deux sens.",
+  ch: [
+    { h: "Tir sec", d: "Direct, sans hésiter.", t: "Rapide", mech: "shoot" },
+    { h: "Attaquer le cercle", d: "Explosif, dès la première dribble.", t: "Engagé", mech: "drive" },
+    { h: "Faire tourner", d: "Garder le jeu réversible.", t: "Collectif", mech: "pass" },
+  ] });
+
+D_({ id: "floater_lane", w: 2,
+  head: "Fenêtre dans la raquette",
+  body: "Tu es dans la raquette, entre le défenseur extérieur et l'intérieur qui recule — une fenêtre étroite s'ouvre.",
+  ch: [
+    { h: "Petit tir flottant", d: "Une touche délicate.", t: "Technique", mech: "shoot" },
+    { h: "Continuer au cercle", d: "S'engager à fond.", t: "Engagé", mech: "drive" },
+    { h: "Ressortir la balle", d: "La fenêtre s'est refermée.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "double_team_break", w: 1,
+  head: "Double équipe",
+  body: "Deux défenseurs convergent sur toi en même temps. Il faut se sortir de là avant le marcher.",
+  ch: [
+    { h: "Forcer un tir rapide", d: "Avant d'être totalement bloqué.", t: "Risqué", mech: "shoot" },
+    { h: "Fendre les deux défenseurs", d: "Passer entre eux.", t: "Audacieux", mech: "drive" },
+    { h: "Trouver le joueur libre", d: "Un partenaire est forcément démarqué.", t: "Lecture obligatoire", mech: "pass" },
+  ] });
+
+D_({ id: "transition_trail", w: 2,
+  head: "Retard en transition",
+  body: "Tu arrives en deuxième vague sur la contre-attaque, le ballon peut encore te trouver derrière l'arc.",
+  ch: [
+    { h: "Tir à trois points", d: "Profiter du rythme.", t: "Rythme", mech: "shoot" },
+    { h: "Continuer vers le cercle", d: "Poursuivre l'action.", t: "Engagé", mech: "drive" },
+    { h: "Temporiser le jeu", d: "Laisser l'attaque se poser.", t: "Collectif", mech: "pass" },
+  ] });
+
+/* ── situations défensives supplémentaires ── */
+
+D_({ id: "charge_take", w: 1, flavor: "defense",
+  head: "Prendre la charge",
+  body: "Tu tiens ta position, l'attaquant te percute de plein fouet — faute offensive sifflée. Le ballon revient à ton équipe, remis en jeu tout de suite.",
+  ch: [
+    { h: "Chercher le tir sur la remise", d: "Profiter de la surprise.", t: "Rapide", mech: "shoot" },
+    { h: "Attaquer directement", d: "Sans attendre.", t: "Direct", mech: "drive" },
+    { h: "Relancer le jeu", d: "Poser l'attaque.", t: "Posé", mech: "pass" },
+  ] });
+
+D_({ id: "help_rotation", w: 2, flavor: "defense",
+  head: "Rotation défensive",
+  body: "Tu quittes ton vis-à-vis pour aider sur la pénétration adverse — l'interception réussit, et te voilà lancé.",
+  ch: [
+    { h: "Filer en contre-attaque", d: "Ne pas perdre de temps.", t: "Immédiat", mech: "drive" },
+    { h: "Chercher le trois points", d: "Le terrain est écarté.", t: "Opportuniste", mech: "shoot" },
+    { h: "Structurer l'attaque", d: "Reposer le jeu.", t: "Collectif", mech: "pass" },
+  ] });
+
+D_({ id: "full_court_press", w: 2, flavor: "defense",
+  head: "Pressing tout terrain",
+  body: "Le pressing paie : le porteur de balle adverse hésite, la balle est à portée de main.",
+  ch: [
+    { h: "Intercepter et foncer", d: "Ne rien laisser au hasard.", t: "Agressif", mech: "drive" },
+    { h: "Intercepter et tirer", d: "Le terrain est ouvert.", t: "Opportuniste", mech: "shoot" },
+    { h: "Intercepter et temporiser", d: "Reprendre le contrôle du jeu.", t: "Contrôlé", mech: "pass" },
+  ] });
+
+D_({ id: "rebound_battle", w: 2, flavor: "defense",
+  head: "Bataille au rebond défensif",
+  body: "Le tir adverse est manqué, la balle rebondit au milieu d'une mêlée de joueurs — c'est à qui l'attrapera.",
+  ch: [
+    { h: "Sécuriser puis pousser", d: "Lancer la transition.", t: "Rapide", mech: "drive" },
+    { h: "Sécuriser puis viser", d: "Prendre le tir de loin.", t: "Confiant", mech: "shoot" },
+    { h: "Sécuriser puis relancer", d: "Poser l'attaque.", t: "Prudent", mech: "pass" },
+  ] });
+
+/* ── situations par poste supplémentaires ── */
+
+D_({ id: "pg_full_court", w: 2, positions: ["PG"],
+  head: "Montée de balle sous pression",
+  body: "Le pressing adverse t'attend dès la sortie de terrain — en tant que meneur, c'est à toi de faire avancer le jeu.",
+  ch: [
+    { h: "Accélérer et attaquer", d: "Casser le pressing par la vitesse.", t: "Direct", mech: "drive" },
+    { h: "Chercher le tir rapide", d: "Profiter de la surprise.", t: "Audacieux", mech: "shoot" },
+    { h: "Passer le pressing en relançant", d: "La sécurité avant tout.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "pg_pick_reject", w: 2, positions: ["PG"],
+  head: "Refuser l'écran",
+  body: "L'écran est posé, mais le défenseur triche déjà pour l'anticiper — parfois la meilleure option est de ne pas l'utiliser.",
+  ch: [
+    { h: "Attaquer avant l'écran", d: "Le prendre de vitesse.", t: "Rapide", mech: "drive" },
+    { h: "Tirer directement", d: "Il ne l'attend pas.", t: "Surprise", mech: "shoot" },
+    { h: "Utiliser l'écran quand même", d: "Revenir au plan classique.", t: "Classique", mech: "pass" },
+  ] });
+
+D_({ id: "sg_baseline_cut", w: 2, positions: ["SG"],
+  head: "Coupe ligne de fond",
+  body: "Sans le ballon, tu sens l'ouverture le long de la ligne de fond — le timing doit être parfait.",
+  ch: [
+    { h: "Recevoir et tirer", d: "Un mouvement travaillé.", t: "Précis", mech: "shoot" },
+    { h: "Recevoir et enchaîner au cercle", d: "Continuer sur sa lancée.", t: "Opportuniste", mech: "drive" },
+    { h: "Continuer le mouvement sans ballon", d: "Laisser venir le jeu.", t: "Discipline", mech: "pass" },
+  ] });
+
+D_({ id: "sg_iso_closeout", w: 2, positions: ["SG"],
+  head: "Attaquer la fermeture",
+  body: "Le défenseur se précipite pour fermer ta ligne de tir — un déséquilibre à exploiter tout de suite.",
+  ch: [
+    { h: "Tirer avant qu'il n'arrive", d: "Une fenêtre courte.", t: "Rapide", mech: "shoot" },
+    { h: "Attaquer son excès de vitesse", d: "Le prendre à contre-pied.", t: "Direct", mech: "drive" },
+    { h: "Faire circuler", d: "Chercher mieux.", t: "Patient", mech: "pass" },
+  ] });
+
+D_({ id: "sf_transition_finish", w: 2, positions: ["SF"],
+  head: "Finition en transition",
+  body: "La contre-attaque bat son plein, tu es à mi-chemin entre le tir extérieur et la finition au cercle.",
+  ch: [
+    { h: "Foncer finir au cercle", d: "Profiter de l'athlétisme.", t: "Athlétique", mech: "drive" },
+    { h: "S'arrêter pour le tir", d: "Un choix plus contrôlé.", t: "Contrôlé", mech: "shoot" },
+    { h: "Servir le partenaire démarqué", d: "Le jeu collectif avant tout.", t: "Collectif", mech: "pass" },
+  ] });
+
+D_({ id: "sf_post_mismatch", w: 2, positions: ["SF"],
+  head: "Mésentente de taille au poste",
+  body: "Un défenseur plus petit se retrouve sur toi au poste bas — l'occasion est trop belle pour la laisser passer.",
+  ch: [
+    { h: "Jouer la puissance", d: "Imposer le rapport de force.", t: "Physique", mech: "drive" },
+    { h: "Tir en pivotant", d: "Un geste travaillé.", t: "Technique", mech: "shoot" },
+    { h: "Ressortir si ça se referme", d: "Rester patient.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "pf_roll_man", w: 2, positions: ["PF"],
+  head: "Roulade vers le cercle",
+  body: "Après avoir posé l'écran, tu roules vers le cercle — la défense doit choisir qui laisser seul.",
+  ch: [
+    { h: "Foncer recevoir au cercle", d: "Profiter de l'espace créé.", t: "Direct", mech: "drive" },
+    { h: "Se réétaler pour le tir", d: "L'option pop plutôt que roll.", t: "Moderne", mech: "shoot" },
+    { h: "Laisser le jeu se faire ailleurs", d: "Rester discipliné.", t: "Discipline", mech: "pass" },
+  ] });
+
+D_({ id: "pf_offensive_board", w: 2, positions: ["PF"],
+  head: "Écran offensif",
+  body: "Le tir part, tu es déjà en position pour te battre sur le rebond offensif.",
+  ch: [
+    { h: "Remettre directement", d: "Suivre son instinct.", t: "Immédiat", mech: "drive" },
+    { h: "Ressortir pour un tir propre", d: "Recomposer l'action.", t: "Technique", mech: "shoot" },
+    { h: "Redistribuer vers l'extérieur", d: "Reposer le jeu.", t: "Collectif", mech: "pass" },
+  ] });
+
+D_({ id: "c_lob_finish", w: 2, positions: ["C"],
+  head: "Finition sur alley-oop",
+  body: "Le ballon est lobé vers le cercle, c'est à toi de conclure au-dessus de tout le monde.",
+  ch: [
+    { h: "Conclure en puissance", d: "Un geste spectaculaire.", t: "Spectaculaire", mech: "drive" },
+    { h: "Redescendre pour un appui sûr", d: "Ne pas forcer.", t: "Prudent", mech: "shoot" },
+    { h: "Relayer si ça se complique", d: "La sécurité avant tout.", t: "Sécurité", mech: "pass" },
+  ] });
+
+D_({ id: "c_high_post", w: 2, positions: ["C"],
+  head: "Meneur de jeu au poste haut",
+  body: "Ballon reçu au sommet de la raquette, toute l'attaque peut passer par tes mains un instant.",
+  ch: [
+    { h: "Attaquer directement", d: "Profiter de l'ouverture.", t: "Direct", mech: "drive" },
+    { h: "Tirer depuis le poste haut", d: "Une option inattendue.", t: "Inattendu", mech: "shoot" },
+    { h: "Distribuer vers le jeu", d: "Faire jouer les autres.", t: "Altruiste", mech: "pass" },
+  ] });
+
+/* ── deuxième vague de situations universelles ── */
+
+D_({ id: "backdoor_cut", w: 2,
+  head: "Coupe en backdoor",
+  body: "Ton défenseur anticipe trop haut sur la ligne de passe — la voie est libre derrière lui, vers le cercle.",
+  ch: [
+    { h: "Couper et recevoir au cercle", d: "Le timing parfait.", t: "Direct", mech: "drive" },
+    { h: "S'arrêter pour un tir court", d: "Une option plus sûre.", t: "Technique", mech: "shoot" },
+    { h: "Revenir vers le ballon", d: "Si la passe n'arrive pas.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "flare_screen", w: 2,
+  head: "Écran flare",
+  body: "Un partenaire pose un écran dans ton dos, tu t'écartes vers le corner pendant que ton défenseur cherche l'angle.",
+  ch: [
+    { h: "Tir depuis l'écran flare", d: "L'espace est là.", t: "Écarté", mech: "shoot" },
+    { h: "Enchaîner vers l'intérieur", d: "Profiter du désordre défensif.", t: "Opportuniste", mech: "drive" },
+    { h: "Reposer le jeu", d: "Attendre une meilleure occasion.", t: "Patient", mech: "pass" },
+  ] });
+
+D_({ id: "broken_play_scramble", w: 1,
+  head: "Attaque cassée",
+  body: "Le jeu prévu part en vrille, il ne reste que quelques secondes pour improviser quelque chose de propre.",
+  ch: [
+    { h: "Créer seul dans le chaos", d: "Il faut faire quelque chose.", t: "Improvisé", mech: "drive" },
+    { h: "Prendre le tir disponible", d: "Ne pas trop réfléchir.", t: "Instinctif", mech: "shoot" },
+    { h: "Trouver le joueur le plus libre", d: "Sauver la possession.", t: "Lecture obligatoire", mech: "pass" },
+  ] });
+
+D_({ id: "late_clock_heave", w: 1, clutchWeighted: true,
+  head: "Fin des 24 secondes",
+  body: "L'horloge de possession s'éteint dans un instant. Il n'y a plus vraiment le temps de bien faire les choses.",
+  ch: [
+    { h: "Tir désespéré", d: "Mieux vaut tenter que rien.", t: "Quitte ou double", mech: "shoot" },
+    { h: "Forcer au cercle", d: "Chercher au moins la faute.", t: "Sans filet", mech: "drive" },
+    { h: "Chercher un dernier relais", d: "Une passe risquée mais possible.", t: "Désespéré", mech: "pass" },
+  ] });
+
+D_({ id: "loose_ball_scramble", w: 2, flavor: "defense",
+  head: "Ballon en mêlée",
+  body: "Le ballon traîne au sol au milieu d'une mêlée de joueurs — le premier à la sécuriser change tout.",
+  ch: [
+    { h: "Plonger et repartir", d: "Ne pas perdre une seconde.", t: "Engagé", mech: "drive" },
+    { h: "Sécuriser puis viser", d: "Se relever et tirer.", t: "Confiant", mech: "shoot" },
+    { h: "Sécuriser et temporiser", d: "Reposer le jeu calmement.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "horns_set", w: 2,
+  head: "Disposition en cornes",
+  body: "Deux intérieurs postés aux coudes, toi au sommet — plusieurs lectures s'offrent selon comment la défense réagit.",
+  ch: [
+    { h: "Utiliser l'écran le plus proche", d: "Attaquer directement.", t: "Direct", mech: "drive" },
+    { h: "Tirer par-dessus", d: "Si la défense recule.", t: "Opportuniste", mech: "shoot" },
+    { h: "Trouver l'intérieur démarqué", d: "Lire le bon côté.", t: "Vision de jeu", mech: "pass" },
+  ] });
+
+/* ── deuxième vague de situations défensives ── */
+
+D_({ id: "deflection_and_go", w: 2, flavor: "defense",
+  head: "Déviation et poursuite",
+  body: "Ta main dévie la passe adverse — le ballon part devant toi, c'est une course pour le récupérer en premier.",
+  ch: [
+    { h: "Rattraper et foncer", d: "Ne pas ralentir.", t: "Rapide", mech: "drive" },
+    { h: "Rattraper et tirer", d: "Le terrain est dégagé.", t: "Opportuniste", mech: "shoot" },
+    { h: "Rattraper et relancer", d: "Reposer calmement.", t: "Contrôlé", mech: "pass" },
+  ] });
+
+D_({ id: "boxout_secure", w: 2, flavor: "defense",
+  head: "Rebond sécurisé sous pression",
+  body: "Tu tiens ta position sur l'écran de rebond et sécurises le ballon avant que l'attaque ne se réorganise.",
+  ch: [
+    { h: "Pousser tout de suite", d: "Ne pas laisser la défense se replacer.", t: "Rapide", mech: "drive" },
+    { h: "Chercher le tir en transition", d: "Une fenêtre s'ouvre déjà.", t: "Confiant", mech: "shoot" },
+    { h: "Relancer proprement", d: "Reposer l'attaque.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "late_clock_stop", w: 1, flavor: "defense",
+  head: "Arrêt en fin d'horloge",
+  body: "Ton marquage force un tir difficile à l'adversaire, raté — la balle est à toi avec le terrain grand ouvert devant.",
+  ch: [
+    { h: "Partir en contre-attaque", d: "Personne ne s'y attend.", t: "Immédiat", mech: "drive" },
+    { h: "Chercher le tir de loin", d: "Le terrain est encore ouvert.", t: "Opportuniste", mech: "shoot" },
+    { h: "Reposer le jeu", d: "Prendre son temps.", t: "Collectif", mech: "pass" },
+  ] });
+
+/* ── deuxième vague de situations par poste ── */
+
+D_({ id: "pg_hesitation", w: 2, positions: ["PG"],
+  head: "Dribble d'hésitation",
+  body: "Un changement de rythme suffit parfois à déséquilibrer complètement un défenseur trop sur ses appuis.",
+  ch: [
+    { h: "Accélérer après l'hésitation", d: "Le déséquilibre est créé.", t: "Direct", mech: "drive" },
+    { h: "Tirer sur l'hésitation", d: "Il recule d'un pas de trop.", t: "Technique", mech: "shoot" },
+    { h: "Redistribuer le jeu", d: "Utiliser l'attention qu'il te porte.", t: "Vision de jeu", mech: "pass" },
+  ] });
+
+D_({ id: "sg_flare_three", w: 2, positions: ["SG"],
+  head: "Trois points sur écran flare",
+  body: "Le ballon change de côté, un écran flare te libère juste à temps pour une ligne de tir dégagée.",
+  ch: [
+    { h: "Tir à trois points", d: "La fenêtre classique du poste.", t: "Spécialiste", mech: "shoot" },
+    { h: "Enchaîner vers l'intérieur", d: "Si le défenseur ferme trop vite.", t: "Opportuniste", mech: "drive" },
+    { h: "Ressortir la balle", d: "Chercher mieux.", t: "Patient", mech: "pass" },
+  ] });
+
+D_({ id: "sf_euro_step", w: 2, positions: ["SF"],
+  head: "Euro-step dans la raquette",
+  body: "Lancé vers le cercle, un changement d'appui te fait éviter le dernier défenseur sur ta route.",
+  ch: [
+    { h: "Finir en euro-step", d: "Le geste travaillé.", t: "Technique", mech: "drive" },
+    { h: "S'arrêter pour un tir court", d: "Plus sûr que forcer.", t: "Contrôlé", mech: "shoot" },
+    { h: "Ressortir si ça se ferme", d: "Ne pas forcer le passage.", t: "Prudent", mech: "pass" },
+  ] });
+
+D_({ id: "pf_short_roll", w: 2, positions: ["PF"],
+  head: "Court-roulade et lecture",
+  body: "Après l'écran, tu t'arrêtes à mi-chemin du cercle — ni tout à fait roulade, ni tout à fait extérieur, une vraie option de jeu.",
+  ch: [
+    { h: "Continuer vers le cercle", d: "Achever le mouvement.", t: "Direct", mech: "drive" },
+    { h: "Tirer depuis la mi-distance", d: "L'espace suffit.", t: "Technique", mech: "shoot" },
+    { h: "Distribuer depuis le milieu", d: "Une vue parfaite sur tout le terrain.", t: "Vision de jeu", mech: "pass" },
+  ] });
+
+D_({ id: "c_deep_seal", w: 2, positions: ["C"],
+  head: "Sceller profond",
+  body: "Tu prends la position la plus proche du cercle possible et scelles ton défenseur derrière toi.",
+  ch: [
+    { h: "Forcer en puissance", d: "La position est gagnée.", t: "Physique", mech: "drive" },
+    { h: "Petit tir au cercle", d: "Un geste économe.", t: "Technique", mech: "shoot" },
+    { h: "Ressortir si ça se complique", d: "Rejouer le ballon.", t: "Prudent", mech: "pass" },
   ] });
 
 /* Pool filtré par poste : les situations universelles restent tirables
@@ -7543,6 +7897,12 @@ function duelRenderMySituation(skipNext) {
   }
 
   arena.appendChild(choiceBox);
+
+  /* Sur petit écran, le récap de l'action précédente (panneau manga +
+     texte) pousse le compte à rebours hors de l'écran — sans ça, le
+     joueur perd un temps précieux à faire défiler avant de voir qu'il
+     doit choisir. On amène directement le chrono à l'écran. */
+  requestAnimationFrame(() => { timeEl.scrollIntoView({ behavior: "smooth", block: "start" }); });
 
   let remain = DUEL.CHOICE_SECONDS;
   DUEL_COUNTDOWN_H = setInterval(() => {
