@@ -832,16 +832,38 @@ DUEL.googleLinkedInfo = function () {
   return g ? { email: g.email, name: g.displayName } : null;
 };
 
+/* Sur Safari (iOS et Mac), la protection anti-traçage (ITP) bloque
+   souvent l'accès au storage tiers dont linkWithPopup a besoin pour
+   relayer le résultat : le sélecteur de compte Google s'affiche, le
+   joueur choisit un compte, puis Firebase rapporte à tort un
+   auth/popup-closed-by-user et tout s'arrête sans message. On évite
+   complètement le popup sur ces navigateurs et on part direct en
+   redirection plein écran, bien plus fiable là-bas. */
+DUEL._isSafariLike = function () {
+  const ua = (navigator.userAgent || "");
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  const isSafari = /^((?!chrome|crios|fxios|android).)*safari/i.test(ua);
+  return isIOS || isSafari;
+};
+
+DUEL.REDIRECT_PENDING_KEY = "parquet_google_redirect_pending";
+
 DUEL.linkGoogle = function (cb) {
   DUEL.ensureAuth(() => {
     const provider = new firebase.auth.GoogleAuthProvider();
     const user = firebase.auth().currentUser;
+    if (DUEL._isSafariLike()) {
+      try { localStorage.setItem(DUEL.REDIRECT_PENDING_KEY, "1"); } catch (e) {}
+      user.linkWithRedirect(provider);
+      return;
+    }
     user.linkWithPopup(provider)
       .then((result) => cb(null, { email: result.user.email, name: result.user.displayName }))
       .catch((e) => {
         /* popup bloqué (fréquent sur mobile) : on retente en redirection
            plein écran — le retour est repris par DUEL.checkGoogleRedirect. */
         if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") {
+          try { localStorage.setItem(DUEL.REDIRECT_PENDING_KEY, "1"); } catch (er) {}
           user.linkWithRedirect(provider);
           return;
         }
@@ -850,13 +872,20 @@ DUEL.linkGoogle = function (cb) {
   });
 };
 
-/* à appeler une fois le SDK chargé (voir duelOpenLobby) pour récupérer
-   le résultat d'une éventuelle redirection Google laissée en attente. */
+/* à appeler une fois le SDK chargé (voir duelOpenLobby et boot()) pour
+   récupérer le résultat d'une éventuelle redirection Google laissée
+   en attente. */
 DUEL.checkGoogleRedirect = function (cb) {
   if (!DUEL.ready() || typeof firebase === "undefined") return;
   firebase.auth().getRedirectResult()
-    .then((result) => { if (result && result.user && result.credential) cb(null, { email: result.user.email, name: result.user.displayName }); })
-    .catch((e) => cb(e));
+    .then((result) => {
+      try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (e) {}
+      if (result && result.user && result.credential) cb(null, { email: result.user.email, name: result.user.displayName });
+    })
+    .catch((e) => {
+      try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (er) {}
+      cb(e);
+    });
 };
 
 DUEL.seatPayload = function (uid, p) {

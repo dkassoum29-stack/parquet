@@ -2527,6 +2527,31 @@ function showProfiles(flash) {
 
 function boot() {
   renderProfileChip();
+  /* retour d'une connexion Google en redirection plein écran (Safari) :
+     avant tout le reste, on va chercher son résultat pendant que le
+     SDK est encore froid, sinon il est perdu pour de bon. */
+  let pendingGoogle = false;
+  try { pendingGoogle = typeof DUEL !== "undefined" && localStorage.getItem(DUEL.REDIRECT_PENDING_KEY) === "1"; } catch (e) {}
+  if (pendingGoogle) {
+    DUEL.loadFirebaseSDK().then(() => {
+      DUEL.checkGoogleRedirect((err, info) => {
+        if (!info) { bootFinish(); return; }
+        PROFILE.rememberGoogleLinked();
+        PROFILE.reconcileWithCloud((result) => {
+          resolveGoogleConflicts(result, () => {
+            if (!PROFILE.active()) { showProfiles("Compte Google connecté."); return; }
+            renderProfileChip();
+            bootFinish();
+          });
+        });
+      });
+    });
+    return;
+  }
+  bootFinish();
+}
+
+function bootFinish() {
   /* pas encore de compte : on commence par là */
   if (!PROFILE.active()) { showProfiles(); return; }
   const saved = loadSave();
