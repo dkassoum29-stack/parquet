@@ -1564,6 +1564,8 @@ button { font: inherit; color: inherit; }
 .pan-name { font-weight: 700; font-size: 14.5px; }
 .pan-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 .pan-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 42%; }
+.pan-row-click { cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.pan-row-click:hover, .pan-row-click:focus-visible { border-color: var(--accent); }
 
 /* ═══════════════ RESPONSIVE ═══════════════ */
 
@@ -1616,6 +1618,76 @@ button { font: inherit; color: inherit; }
 /* ═══════════════ DUEL EN DIRECT ═══════════════ */
 
 .duel-msg { color: var(--text-2); font-size: 13.5px; line-height: 1.5; margin-bottom: 16px; }
+.duel-links-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.duel-links-row .btn { flex: 1 1 auto; }
+.duel-mode-card { margin-bottom: 14px; }
+.duel-mode-card:last-child { margin-bottom: 0; }
+.duel-mode-card .card-title { margin-bottom: 8px; }
+.duel-mode-card .duel-msg { margin-bottom: 12px; }
+.duel-mode-card .field { margin-top: 12px; margin-bottom: 10px; }
+.duel-inline-add { display: flex; gap: 8px; }
+.duel-inline-add input { flex: 1; }
+.duel-inline-add .btn { flex: none; }
+.duel-friends-list { display: grid; gap: 8px; margin-bottom: 12px; }
+.duel-friend-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.duel-challenge-banner { border-color: var(--accent); }
+
+.duel-hero-card {
+  background: var(--surface);
+  border: 1px solid var(--gain);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.duel-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.duel-hero-name { font-family: var(--f-display); font-size: 22px; line-height: 1.15; }
+.duel-hero-pos { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
+.duel-hero-title { font-size: 12px; font-style: italic; color: var(--gold); margin-top: 3px; }
+.duel-hero-ovr { font-family: var(--f-mono); font-size: 28px; font-weight: 700; line-height: 1; color: var(--leather); text-align: right; }
+.duel-hero-ovr-label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); text-align: right; margin-top: 3px; }
+.duel-hero-tokens { font-family: var(--f-mono); font-size: 12px; color: var(--gold); text-align: right; margin-top: 6px; }
+.duel-hero-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft);
+}
+.duel-hero-stat-label { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 3px; }
+.duel-hero-stat-value { font-family: var(--f-mono); font-size: 15px; font-weight: 700; color: var(--gain); font-variant-numeric: tabular-nums; }
+.duel-rank-bar { height: 6px; border-radius: 3px; background: var(--bg-sunk); overflow: hidden; margin-top: 12px; border: 1px solid var(--line-soft); }
+.duel-rank-bar-fill { display: block; height: 100%; border-radius: 3px; transition: width .4s ease; }
+.duel-rank-next { font-size: 11px; color: var(--text-3); margin-top: 5px; }
+.duel-hero-trophies {
+  display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px;
+  padding-top: 14px; border-top: 1px solid var(--line-soft);
+}
+.duel-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600;
+  padding: 5px 10px 5px 7px; border-radius: 999px;
+  border: 1px solid var(--line-soft); background: var(--bg-sunk); color: var(--text-2);
+}
+.duel-badge .ic { font-size: 13px; }
+.duel-badge.tier { font-family: var(--f-mono); font-weight: 700; }
+.duel-hero-card-lg { padding: 22px; }
+.duel-hero-card-lg .duel-hero-name { font-size: 27px; }
+.duel-hero-card-lg .duel-hero-ovr { font-size: 34px; }
+.duel-hero-card-lg .duel-hero-stat-value { font-size: 18px; }
+
+.duel-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+.duel-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 6px;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.duel-tab:hover { color: var(--text); border-color: var(--text-3); }
+.duel-tab.active { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .duel-or {
   text-align: center; color: var(--text-3); font-size: 11.5px;
   letter-spacing: .08em; text-transform: uppercase; margin: 18px 0;

@@ -2482,6 +2482,8 @@ function resumeInner() {
    SAVE() ni HALL() — un duel ne peut rien casser dans une partie
    en cours. */
 let DUEL_UI = null;
+let DUEL_INCOMING_CHALLENGE = null;
+let DUEL_HOME_TAB = "saison";
 
 function duelReset() {
   DUEL.leaveRoom();
@@ -2512,9 +2514,19 @@ function duelShowScoutingThen(oppName, oppAttrs, onContinue) {
 function duelOpenLobby() {
   duelReset();
   show("screen-duel-lobby");
-  if (!DUEL.ready()) { worldDrawUnavailable(); return; }
-  const c = DUEL.getCharacter();
-  if (!c) worldDrawCreateCharacter(); else worldDrawHome();
+  const b = $("duel-lobby-body");
+  b.innerHTML = "";
+  b.appendChild(el("p", "duel-msg", "Chargement du monde multijoueur…"));
+  DUEL.loadFirebaseSDK().then(() => {
+    if ($("screen-duel-lobby").classList.contains("hidden")) return;
+    if (!DUEL.ready()) { worldDrawUnavailable(); return; }
+    const c = DUEL.getCharacter();
+    if (!c) worldDrawCreateCharacter(); else worldDrawHome();
+    DUEL.listenChallenges((ch) => {
+      DUEL_INCOMING_CHALLENGE = ch;
+      if ($("duel-lobby-body").dataset.view === "home") worldDrawHome();
+    });
+  });
 }
 
 function worldDrawUnavailable() {
@@ -2528,6 +2540,7 @@ function worldDrawUnavailable() {
 function worldDrawCreateCharacter() {
   const b = $("duel-lobby-body");
   b.innerHTML = "";
+  b.dataset.view = "create";
   b.appendChild(el("h2", "create-title", "Ton joueur multijoueur"));
   b.appendChild(el("p", "duel-msg", "Un seul personnage, séparé de ta carrière solo, pour tout le monde multijoueur : saison, amis, adversaires aléatoires."));
 
@@ -2561,63 +2574,173 @@ function worldDrawCreateCharacter() {
   createBtn.onclick = () => {
     const name = nameInp.value.trim();
     if (!name) { msg.textContent = "Entre un nom d'abord."; return; }
-    DUEL.createCharacter(name, selectedPos);
-    worldDrawHome();
+    createBtn.disabled = true; msg.textContent = "Vérification du pseudo…";
+    DUEL.reserveName(name, (ok, err) => {
+      createBtn.disabled = false;
+      if (!ok) { msg.textContent = err; return; }
+      DUEL.createCharacter(name, selectedPos);
+      worldDrawHome();
+    });
   };
   b.appendChild(createBtn);
   b.appendChild(msg);
 }
+
+/* ─── carte joueur façon REP NBA 2K : rang coloré + barre de progression + badge de victoires à palier ─── */
+function duelBuildHeroCard(name, bioLine, ovr, profile, big, isMine) {
+  const hero = el("div", "duel-hero-card" + (big ? " duel-hero-card-lg" : ""));
+  hero.style.borderColor = DUEL.themeColorFor(profile.theme || "default");
+  const heroTop = el("div", "duel-hero-top");
+  const heroId = el("div");
+  const emblem = DUEL.emblemIconFor(profile.emblem || "default");
+  heroId.appendChild(el("div", "duel-hero-name", (emblem ? emblem + " " : "") + name));
+  const title = DUEL.titleTextFor(profile.title || "default");
+  if (title) heroId.appendChild(el("div", "duel-hero-title", "« " + title + " »"));
+  heroId.appendChild(el("div", "duel-hero-pos", bioLine));
+  heroTop.appendChild(heroId);
+  const heroOvr = el("div");
+  heroOvr.appendChild(el("div", "duel-hero-ovr", ovr != null ? String(ovr) : "—"));
+  heroOvr.appendChild(el("div", "duel-hero-ovr-label", "OVR"));
+  if (isMine) heroOvr.appendChild(el("div", "duel-hero-tokens", "🪙 " + DUEL.getTokens()));
+  heroTop.appendChild(heroOvr);
+  hero.appendChild(heroTop);
+
+  const info = DUEL.rankInfo(profile.rating);
+  const played = profile.wins + profile.draws + profile.losses;
+  const winPct = played > 0 ? Math.round((profile.wins / played) * 100) : 0;
+  const heroStats = el("div", "duel-hero-stats");
+  [
+    ["Rang", info.label, info.color],
+    ["Cote", String(profile.rating), null],
+    ["V-N-D", `${profile.wins}-${profile.draws}-${profile.losses}`, null],
+    ["Victoires", winPct + " %", null],
+    ["Matchs", String(played), null],
+  ].forEach(([label, val, color]) => {
+    const st = el("div", "duel-hero-stat");
+    st.appendChild(el("div", "duel-hero-stat-label", label));
+    const valEl = el("div", "duel-hero-stat-value", val);
+    if (color) valEl.style.color = color;
+    st.appendChild(valEl);
+    heroStats.appendChild(st);
+  });
+  hero.appendChild(heroStats);
+
+  const rankBar = el("div", "duel-rank-bar");
+  const rankFill = el("div", "duel-rank-bar-fill");
+  rankFill.style.width = Math.round(info.progress * 100) + "%";
+  rankFill.style.background = info.color;
+  rankBar.appendChild(rankFill);
+  hero.appendChild(rankBar);
+  hero.appendChild(el("div", "duel-rank-next", info.next ? "Prochain rang : " + info.next : "Rang maximum atteint"));
+
+  const heroTrophies = el("div", "duel-hero-trophies");
+  const winTier = DUEL.winsBadgeTier(profile.wins);
+  if (winTier) {
+    const chip = el("span", "duel-badge tier", "");
+    chip.appendChild(el("span", "ic", "🏅"));
+    chip.appendChild(document.createTextNode("Victoires — " + winTier.label));
+    chip.style.color = winTier.color;
+    chip.style.borderColor = winTier.color;
+    heroTrophies.appendChild(chip);
+  }
+  const otherBadges = (profile.badges || []).filter((bd) => bd !== "10 victoires");
+  otherBadges.forEach((bd) => {
+    const chip = el("span", "duel-badge", "");
+    chip.appendChild(el("span", "ic", DUEL_BADGE_ICONS[bd] || "🎖️"));
+    chip.appendChild(document.createTextNode(bd));
+    heroTrophies.appendChild(chip);
+  });
+  if (!winTier && !otherBadges.length) heroTrophies.appendChild(el("span", "duel-badge", "Aucun badge pour l'instant"));
+  hero.appendChild(heroTrophies);
+
+  return hero;
+}
+
+const DUEL_BADGE_ICONS = {
+  "Sans-faute": "💯",
+  "Champion de conférence": "🏆",
+};
 
 /* ─── écran d'entrée du monde multijoueur ─── */
 function worldDrawHome() {
   const c = DUEL.getCharacter();
   const b = $("duel-lobby-body");
   b.innerHTML = "";
+  b.dataset.view = "home";
   b.appendChild(el("h2", "create-title", "Monde multijoueur"));
 
-  const card = el("div", "duel-seat-row ready");
-  const posLabel = (DATA.POSITIONS.find((p) => p.id === c.position) || {}).label || "";
-  card.appendChild(el("span", "duel-seat-name", ENG.name(c) + " · " + posLabel));
-  card.appendChild(el("span", "duel-seat-ovr", "OVR " + ENG.ovr(c)));
-  const gradeEl = el("span", "duel-seat-state", "…");
-  card.appendChild(gradeEl);
-  b.appendChild(card);
-  DUEL.getMyRating((rating) => { gradeEl.textContent = DUEL.rankLabel(rating) + " · " + rating; });
-
-  if ((c.badges || []).length) {
-    const badgeRow = el("p", "duel-msg", "Badges : " + c.badges.map((bd) => bd.label || bd).join(" · "));
-    b.appendChild(badgeRow);
+  /* ─── défi reçu d'un ami ─── */
+  if (DUEL_INCOMING_CHALLENGE) {
+    const ch = DUEL_INCOMING_CHALLENGE;
+    const banner = el("div", "card duel-mode-card duel-challenge-banner");
+    banner.appendChild(el("div", "card-title", "Défi reçu"));
+    banner.appendChild(el("p", "duel-msg", (ch.fromName || "Un ami") + " te défie."));
+    const chRow = el("div", "duel-links-row");
+    const acceptBtn = el("button", "btn btn-accent", "Rejoindre");
+    acceptBtn.onclick = () => {
+      const av = DUEL.getCharacter();
+      acceptBtn.disabled = true;
+      DUEL.joinRoom(ch.code, av, (ok, err) => {
+        acceptBtn.disabled = false;
+        if (!ok) { banner.querySelector(".duel-msg").textContent = err || "Échec de la connexion."; return; }
+        DUEL.clearChallenge(); DUEL_INCOMING_CHALLENGE = null;
+        DUEL_UI.mode = "online";
+        DUEL_UI.avatar = av; DUEL_UI.mySeat = "B"; DUEL_UI.code = ch.code; DUEL_UI.isHost = false;
+        duelDrawWaiting();
+      });
+    };
+    chRow.appendChild(acceptBtn);
+    const dismissBtn = el("button", "btn btn-quiet", "Ignorer");
+    dismissBtn.onclick = () => { DUEL.clearChallenge(); DUEL_INCOMING_CHALLENGE = null; worldDrawHome(); };
+    chRow.appendChild(dismissBtn);
+    banner.appendChild(chRow);
+    b.appendChild(banner);
   }
 
-  const redoBtn = el("button", "btn btn-quiet btn-block", "Recommencer avec un nouveau joueur");
-  redoBtn.onclick = () => {
-    ask({
-      kicker: "Confirmation", head: "Recréer ton joueur multijoueur ?",
-      body: "Ton personnage actuel (attributs, franchise, badges) sera remplacé. Ta cote au classement général n'est pas affectée.",
-      chain: false,
-      choices: [
-        { h: "Non, garder ce joueur", d: "", t: "", pick: () => { setActionEnabled(true); worldDrawHome(); } },
-        { h: "Oui, recommencer", d: "", t: "", danger: true,
-          pick: () => { setActionEnabled(true); worldDrawCreateCharacter(); } },
-      ],
-    });
-  };
-  b.appendChild(redoBtn);
+  /* ─── carte profil + liens rapides ─── */
+  const posLabel = (DATA.POSITIONS.find((p) => p.id === c.position) || {}).label || "";
+  const heroSlot = el("div", "duel-hero-slot");
+  heroSlot.appendChild(el("div", "duel-hero-card"));
+  b.appendChild(heroSlot);
+  DUEL.getMyProfile((p) => {
+    heroSlot.innerHTML = "";
+    heroSlot.appendChild(duelBuildHeroCard(ENG.name(c), posLabel, ENG.ovr(c), p, false, true));
+  });
 
-  const boardBtn = el("button", "btn btn-quiet btn-block", "Voir le classement général");
-  boardBtn.onclick = () => duelOpenLeaderboard();
-  b.appendChild(boardBtn);
+  /* ─── onglets : Saison / Aléatoire / Ami / Boutique / Profil ─── */
+  const tabs = el("div", "duel-tabs");
+  const TAB_DEFS = [
+    ["saison", "Saison"], ["aleatoire", "Aléatoire"], ["ami", "Ami"], ["boutique", "Boutique"], ["profil", "Profil"],
+  ];
+  TAB_DEFS.forEach(([id, label]) => {
+    const t = el("button", "duel-tab" + (DUEL_HOME_TAB === id ? " active" : ""), label);
+    t.type = "button";
+    t.onclick = () => { DUEL_HOME_TAB = id; worldDrawHome(); };
+    tabs.appendChild(t);
+  });
+  b.appendChild(tabs);
 
-  b.appendChild(el("div", "duel-or", "— — —"));
-
-  const seasonBtn = el("button", "btn btn-accent btn-block", "Jouer une saison");
-  seasonBtn.onclick = () => worldOpenSeason();
-  b.appendChild(seasonBtn);
-  b.appendChild(el("div", "duel-or", "— ou —"));
-
+  const content = el("div", "duel-tab-content");
+  b.appendChild(content);
   const msg = el("p", "duel-msg", "");
 
-  const randomBtn = el("button", "btn btn-quiet btn-block", "Adversaire aléatoire");
+  /* ─── saison ─── */
+  if (DUEL_HOME_TAB === "saison") {
+  const seasonCard = el("div", "card duel-mode-card");
+  seasonCard.appendChild(el("div", "card-title", "Saison"));
+  seasonCard.appendChild(el("p", "duel-msg", "Contre l'IA locale : calendrier léger et playoffs, aucun salon à créer."));
+  const seasonBtn = el("button", "btn btn-accent btn-block", "Jouer une saison");
+  seasonBtn.onclick = () => worldOpenSeason();
+  seasonCard.appendChild(seasonBtn);
+  content.appendChild(seasonCard);
+  }
+
+  /* ─── adversaire aléatoire ─── */
+  if (DUEL_HOME_TAB === "aleatoire") {
+  const randomCard = el("div", "card duel-mode-card");
+  randomCard.appendChild(el("div", "card-title", "Adversaire aléatoire"));
+  randomCard.appendChild(el("p", "duel-msg", "Matchmaking en ligne contre un autre joueur disponible tout de suite."));
+  const randomBtn = el("button", "btn btn-quiet btn-block", "Chercher un adversaire");
   randomBtn.onclick = () => {
     const av = DUEL.getCharacter();
     DUEL_UI.avatar = av;
@@ -2631,10 +2754,106 @@ function worldDrawHome() {
       duelDrawWaiting();
     });
   };
-  b.appendChild(randomBtn);
-  b.appendChild(el("div", "duel-or", "— ou —"));
+  randomCard.appendChild(randomBtn);
+  content.appendChild(randomCard);
+  }
 
-  const createBtn = el("button", "btn btn-quiet btn-block", "Créer un salon pour un ami");
+  /* ─── boutique ─── */
+  if (DUEL_HOME_TAB === "boutique") {
+  duelRenderShop(content);
+  }
+
+  /* ─── profil ─── */
+  if (DUEL_HOME_TAB === "profil") {
+  const profilCard = el("div", "card duel-mode-card");
+  profilCard.appendChild(el("div", "card-title", "Profil"));
+  const profileBtn = el("button", "btn btn-quiet btn-block", "Voir mon profil complet");
+  profileBtn.onclick = () => DUEL.getMyProfile((p) => duelOpenProfile(p, DUEL.getCharacter(), () => { show("screen-duel-lobby"); worldDrawHome(); }, true));
+  profilCard.appendChild(profileBtn);
+  const boardBtn = el("button", "btn btn-quiet btn-block", "Classement général");
+  boardBtn.onclick = () => duelOpenLeaderboard();
+  profilCard.appendChild(boardBtn);
+  const redoBtn = el("button", "btn btn-quiet btn-block", "Nouveau joueur");
+  redoBtn.onclick = () => {
+    ask({
+      kicker: "Confirmation", head: "Recréer ton joueur multijoueur ?",
+      body: "Ton personnage actuel (attributs, franchise, badges) sera remplacé. Ta cote au classement général n'est pas affectée.",
+      chain: false,
+      choices: [
+        { h: "Non, garder ce joueur", d: "", t: "", pick: () => { setActionEnabled(true); worldDrawHome(); } },
+        { h: "Oui, recommencer", d: "", t: "", danger: true,
+          pick: () => { setActionEnabled(true); worldDrawCreateCharacter(); } },
+      ],
+    });
+  };
+  profilCard.appendChild(redoBtn);
+  content.appendChild(profilCard);
+  }
+
+  /* ─── contre un ami ─── */
+  if (DUEL_HOME_TAB === "ami") {
+  const friendCard = el("div", "card duel-mode-card");
+  friendCard.appendChild(el("div", "card-title", "Contre un ami"));
+  friendCard.appendChild(el("p", "duel-msg", "Ajoute un ami par son pseudo pour le défier en un clic, ou passe par un code."));
+
+  const addWrap = el("div", "field");
+  addWrap.appendChild(el("span", null, "Ajouter un ami (pseudo exact)"));
+  const addRow = el("div", "duel-inline-add");
+  const addInp = el("input");
+  addInp.type = "text"; addInp.placeholder = "Pseudo de ton ami";
+  addRow.appendChild(addInp);
+  const addBtn = el("button", "btn btn-quiet", "Ajouter");
+  addBtn.onclick = () => {
+    const n = addInp.value.trim();
+    if (!n) { msg.textContent = "Entre le pseudo de ton ami."; return; }
+    addBtn.disabled = true;
+    DUEL.addFriend(n, (ok, err) => {
+      addBtn.disabled = false;
+      if (!ok) { msg.textContent = err; return; }
+      addInp.value = ""; msg.textContent = "Ami ajouté.";
+    });
+  };
+  addRow.appendChild(addBtn);
+  addWrap.appendChild(addRow);
+  friendCard.appendChild(addWrap);
+
+  const friendsList = el("div", "duel-friends-list");
+  friendCard.appendChild(friendsList);
+  DUEL.listenFriends((friends) => {
+    friendsList.innerHTML = "";
+    if (!friends.length) {
+      friendsList.appendChild(el("p", "duel-msg", "Aucun ami ajouté pour l'instant."));
+      return;
+    }
+    friends.forEach((f) => {
+      const row = el("div", "duel-seat-row");
+      row.appendChild(el("span", "duel-seat-name", f.name));
+      const btnGroup = el("div", "duel-friend-actions");
+      const challengeBtn = el("button", "btn btn-quiet", "Défier");
+      challengeBtn.onclick = () => {
+        const av = DUEL.getCharacter();
+        challengeBtn.disabled = true; msg.textContent = "Création du salon…";
+        DUEL.challengeFriend(f.uid, av, (code, err) => {
+          challengeBtn.disabled = false;
+          if (!code) { msg.textContent = err || "Échec de la création."; return; }
+          DUEL_UI.mode = "online";
+          DUEL_UI.avatar = av; DUEL_UI.mySeat = "A"; DUEL_UI.code = code; DUEL_UI.isHost = true;
+          duelDrawWaiting();
+        });
+      };
+      btnGroup.appendChild(challengeBtn);
+      const removeBtn = el("button", "btn-icon", "✕");
+      removeBtn.setAttribute("aria-label", "Retirer " + f.name);
+      removeBtn.onclick = () => DUEL.removeFriend(f.uid);
+      btnGroup.appendChild(removeBtn);
+      row.appendChild(btnGroup);
+      friendsList.appendChild(row);
+    });
+  });
+
+  friendCard.appendChild(el("div", "duel-or", "— ou par code —"));
+
+  const createBtn = el("button", "btn btn-quiet btn-block", "Créer un salon");
   createBtn.onclick = () => {
     const av = DUEL.getCharacter();
     createBtn.disabled = true; msg.textContent = "Création du salon…";
@@ -2646,7 +2865,7 @@ function worldDrawHome() {
       duelDrawWaiting();
     });
   };
-  b.appendChild(createBtn);
+  friendCard.appendChild(createBtn);
 
   const codeWrap = el("div", "field");
   codeWrap.appendChild(el("span", null, "Code reçu de ton ami"));
@@ -2654,7 +2873,7 @@ function worldDrawHome() {
   codeInp.type = "text"; codeInp.placeholder = "K7XQ4M"; codeInp.maxLength = 6;
   codeInp.style.textTransform = "uppercase";
   codeWrap.appendChild(codeInp);
-  b.appendChild(codeWrap);
+  friendCard.appendChild(codeWrap);
 
   const joinBtn = el("button", "btn btn-quiet btn-block", "Rejoindre");
   joinBtn.onclick = () => {
@@ -2670,13 +2889,17 @@ function worldDrawHome() {
       duelDrawWaiting();
     });
   };
-  b.appendChild(joinBtn);
+  friendCard.appendChild(joinBtn);
+  content.appendChild(friendCard);
+  }
+
   b.appendChild(msg);
 }
 
 function duelDrawSearching() {
   const b = $("duel-lobby-body");
   b.innerHTML = "";
+  b.dataset.view = "searching";
   b.appendChild(el("h2", "create-title", "Recherche…"));
   b.appendChild(el("p", "duel-msg", "On cherche un adversaire disponible. Ça peut prendre un moment si personne d'autre n'est en ligne."));
   const cancelBtn = el("button", "btn btn-quiet btn-block", "Annuler");
@@ -2704,21 +2927,138 @@ function duelOpenLeaderboard() {
         return;
       }
       rows.forEach((r, i) => {
-        const row = el("div", "pan-row");
+        const row = el("div", "pan-row pan-row-click");
         row.appendChild(el("div", "pan-score", String(r.rating != null ? r.rating : 0)));
         const mid = el("div");
         mid.appendChild(el("div", "pan-name", (i + 1) + ". " + (r.name || "Joueur")));
-        mid.appendChild(el("div", "pan-sub", `${r.wins || 0} victoires · ${r.losses || 0} défaites`));
+        mid.appendChild(el("div", "pan-sub", `${r.wins || 0}V · ${r.draws || 0}N · ${r.losses || 0}D`));
         row.appendChild(mid);
+        row.onclick = () => duelOpenProfile(DUEL.buildProfile(r, null), null, () => duelOpenLeaderboard());
         box.appendChild(row);
       });
     });
   });
 }
 
+/* ─── profil consultable (le mien, un adversaire, une ligne du classement) ─── */
+let DUEL_PROFILE_BACK = () => { show("screen-duel-lobby"); worldDrawHome(); };
+
+function duelOpenProfile(profile, attrsSource, backFn, isMine) {
+  DUEL_PROFILE_BACK = backFn || (() => { show("screen-duel-lobby"); worldDrawHome(); });
+  show("screen-duel-profile");
+  const box = $("duel-profile-body");
+  box.innerHTML = "";
+  if (!profile) {
+    box.appendChild(el("div", "empty-note", "Profil introuvable."));
+    return;
+  }
+  const posLabel = (DATA.POSITIONS.find((p) => p.id === profile.position) || {}).label || "Poste inconnu";
+
+  /* ─── carte joueur ─── */
+  const bio = [posLabel];
+  if (attrsSource && attrsSource.flag) bio.push(attrsSource.flag + " " + (attrsSource.height ? attrsSource.height + " cm" : ""));
+  else if (attrsSource && attrsSource.height) bio.push(attrsSource.height + " cm");
+  if (attrsSource && attrsSource.number != null) bio.push("#" + attrsSource.number);
+  box.appendChild(duelBuildHeroCard(profile.name, bio.filter(Boolean).join(" · "), profile.ovr, profile, true, !!isMine));
+
+  /* ─── répartition d'attributs (dispo pour moi-même et un adversaire en salon) ─── */
+  const attrs = attrsSource && attrsSource.attrs;
+  if (attrs) {
+    const attrsCard = el("div", "card duel-mode-card");
+    attrsCard.appendChild(el("div", "card-title", "Attributs"));
+    const attrsBody = el("div", "attrs-body");
+    DATA.ATTR_GROUPS.forEach((g) => {
+      const sect = el("div");
+      sect.appendChild(el("div", "attr-group-name", g.label));
+      DATA.ATTRS.filter((a) => a.g === g.id).forEach((a) => {
+        const v = Math.round(attrs[a.id] || 0);
+        const attrRow = el("div", "attr");
+        attrRow.appendChild(el("span", "attr-n", a.label));
+        const bar = el("span", "attr-bar");
+        const fill = el("i", tierClass(v));
+        fill.style.width = v + "%";
+        bar.appendChild(fill);
+        attrRow.appendChild(bar);
+        attrRow.appendChild(el("span", "attr-v", v));
+        sect.appendChild(attrRow);
+      });
+      attrsBody.appendChild(sect);
+    });
+    attrsCard.appendChild(attrsBody);
+    box.appendChild(attrsCard);
+  }
+}
+
+/* ─── boutique : jetons gagnés en jouant, dépensés en cosmétiques ─── */
+/* Onglet Boutique de l'accueil multijoueur — quatre familles d'objets
+   cosmétiques (thèmes / emblèmes / titres / taunts), rendues dans le
+   même conteneur générique que les autres onglets. */
+const DUEL_SHOP_CATEGORIES = [
+  { type: "theme",  title: "Thèmes de couleur (carte profil)", equip: true,
+    defaultItem: { id: "default", type: "theme", label: "Thème par défaut", cost: 0, color: "var(--gain)" } },
+  { type: "emblem", title: "Emblèmes (à côté du nom)", equip: true,
+    defaultItem: { id: "default", type: "emblem", label: "Aucun emblème", cost: 0, icon: "" } },
+  { type: "title",  title: "Titres (sous le nom)", equip: true,
+    defaultItem: { id: "default", type: "title", label: "Aucun titre", cost: 0 } },
+  { type: "taunt",  title: "Taunts (chambrage Ami / Aléatoire)", equip: false },
+];
+
+function duelRenderShop(box) {
+  box.innerHTML = "";
+
+  const balance = el("div", "duel-hero-card");
+  balance.style.borderColor = DUEL.themeColor();
+  balance.appendChild(el("div", "card-title", "Jetons"));
+  balance.appendChild(el("div", "duel-hero-ovr", "🪙 " + DUEL.getTokens()));
+  box.appendChild(balance);
+  box.appendChild(el("p", "duel-msg", "Gagnés en jouant en ligne : +20 par victoire, +5 par nul ou défaite, +50 bonus à chaque changement de rang."));
+
+  const msg = el("p", "duel-msg", "");
+
+  DUEL_SHOP_CATEGORIES.forEach((cat) => {
+    const card = el("div", "card duel-mode-card");
+    card.appendChild(el("div", "card-title", cat.title));
+    const items = cat.defaultItem
+      ? [cat.defaultItem].concat(DUEL.SHOP_ITEMS.filter((i) => i.type === cat.type))
+      : DUEL.SHOP_ITEMS.filter((i) => i.type === cat.type);
+    items.forEach((item) => {
+      const row = el("div", "duel-seat-row");
+      const labelText = item.icon ? item.icon + " " + item.label : item.label;
+      const label = el("span", "duel-seat-name", labelText);
+      if (item.color) label.style.color = item.color;
+      row.appendChild(label);
+      const owned = item.cost === 0 || DUEL.isOwned(item.id);
+      const isActive = cat.equip && DUEL.getEquipped(cat.type) === item.id;
+      const btnGroup = el("div", "duel-friend-actions");
+      if (!owned) {
+        const buyBtn = el("button", "btn btn-quiet", `Acheter — ${item.cost} 🪙`);
+        buyBtn.onclick = () => {
+          const res = DUEL.buyItem(item.id);
+          if (!res.ok) { msg.textContent = res.msg; return; }
+          worldDrawHome();
+        };
+        btnGroup.appendChild(buyBtn);
+      } else if (cat.equip) {
+        const equipBtn = el("button", "btn btn-quiet", isActive ? "Équipé" : "Équiper");
+        equipBtn.disabled = isActive;
+        equipBtn.onclick = () => { DUEL.setEquipped(cat.type, item.id); worldDrawHome(); };
+        btnGroup.appendChild(equipBtn);
+      } else {
+        btnGroup.appendChild(el("span", "duel-seat-state", "Possédé"));
+      }
+      row.appendChild(btnGroup);
+      card.appendChild(row);
+    });
+    box.appendChild(card);
+  });
+
+  box.appendChild(msg);
+}
+
 function duelDrawWaiting() {
   const b = $("duel-lobby-body");
   b.innerHTML = "";
+  b.dataset.view = "waiting";
   b.appendChild(el("h2", "create-title", "Salon " + DUEL_UI.code));
   if (DUEL_UI.isHost) {
     b.appendChild(el("p", "duel-msg", "Partage ce code avec ton ami :"));
@@ -2748,6 +3088,10 @@ function duelDrawWaiting() {
       row.appendChild(el("span", "duel-seat-name", seat ? seat.name : "En attente…"));
       row.appendChild(el("span", "duel-seat-ovr", seat ? "OVR " + seat.ovr : ""));
       row.appendChild(el("span", "duel-seat-state", seat ? (seat.ready ? "Prêt" : "…") : ""));
+      if (seat && seat.uid && s !== DUEL_UI.mySeat) {
+        row.classList.add("pan-row-click");
+        row.onclick = () => DUEL.getProfileByUid(seat.uid, seat.name, (p) => duelOpenProfile(p, { attrs: seat.attrs }, () => { show("screen-duel-lobby"); duelDrawWaiting(); }));
+      }
       seatsBox.appendChild(row);
     });
   });
@@ -2884,12 +3228,13 @@ function duelAbandon() {
   if (!DUEL_UI || DUEL_UI.ended) return;
   DUEL_UI.ended = true;
   duelClearCountdown();
-  DUEL.recordResult(false, false);
   if (DUEL_UI.mode === "ai") {
+    DUEL.recordSeasonResult(false);
     const onDone = DUEL_UI.aiOnDone;
     duelReset();
     if (onDone) onDone(false, false, 0, 0);
   } else {
+    DUEL.recordResult(false, false);
     DUEL.deleteRoom(DUEL_UI.code);
     duelReset();
     show("screen-duel-lobby");
@@ -3004,7 +3349,7 @@ function duelRenderMySituation(skipNext) {
     if (DUEL_UI.mode === "online" && mine.lastOutcome.success) {
       DUEL_UI.tauntSentThisRound = false;
       const tauntBox = el("div", "duel-taunts");
-      DUEL.TAUNTS.forEach((text) => {
+      DUEL.availableTaunts().forEach((text) => {
         const tbtn = el("button", "duel-taunt-btn", text);
         tbtn.onclick = () => {
           if (DUEL_UI.tauntSentThisRound) return;
@@ -3188,7 +3533,7 @@ function duelShowResult() {
   duelCheckPerfectBadge(won);
 
   if (DUEL_UI.mode === "ai") {
-    DUEL.recordResult(won, tie);
+    DUEL.recordSeasonResult(won);
     const onDone = DUEL_UI.aiOnDone;
     duelReset();
     if (onDone) onDone(won, tie, myScore, oppScore);
@@ -3348,7 +3693,7 @@ function worldSimulateScheduleGame(c, slot) {
   slot.played = true;
   slot.result = { won, simulated: true };
   if (won) c.season.wins++; else c.season.losses++;
-  DUEL.recordResult(won, false);
+  DUEL.recordSeasonResult(won);
   DUEL.setCharacter(c);
   worldDrawSeasonScreen();
 }
@@ -3418,7 +3763,7 @@ function worldPlaySeriesGame(c, series) {
 function worldSimulateSeriesGame(c, series) {
   const { iAmA, oppTeam } = worldSeriesOpponent(c, series);
   const iWon = ENG.R.chance(worldSimulateWinProb(c, oppTeam));
-  DUEL.recordResult(iWon, false);
+  DUEL.recordSeasonResult(iWon);
   worldApplySeriesGameResult(c, series, iAmA, iWon);
 }
 
@@ -3527,12 +3872,16 @@ document.addEventListener("DOMContentLoaded", () => {
   $("btn-pantheon").onclick = showPantheon;
   $("btn-mp").onclick = () => confirmReplace(() => mpSetup());
   $("btn-duel").onclick = () => duelOpenLobby();
-  $("btn-duel-back").onclick = () => { duelReset(); S && S.p ? backToGame() : boot(); };
+  $("btn-duel-back").onclick = () => {
+    DUEL.stopListenChallenges(); DUEL.stopListenFriends(); DUEL_INCOMING_CHALLENGE = null;
+    duelReset(); S && S.p ? backToGame() : boot();
+  };
   $("btn-duel-leaderboard-back").onclick = () => {
     if (DUEL_LB_REF) { DUEL_LB_REF.off(); DUEL_LB_REF = null; }
     show("screen-duel-lobby");
     worldDrawHome();
   };
+  $("btn-duel-profile-back").onclick = () => DUEL_PROFILE_BACK();
   $("btn-world-season-back").onclick = () => { show("screen-duel-lobby"); worldDrawHome(); };
 
   $("btn-menu").onclick = () => {

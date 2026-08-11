@@ -1,0 +1,10 @@
+{
+  "name": "parquet",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Outils de build pour PARQUET (minification de bundle.js et parquet.css) — le site lui-même reste statique, sans framework.",
+  "devDependencies": {
+    "terser": "^5.49.2",
+    "csso-cli": "^4.0.2"
+  }
+}

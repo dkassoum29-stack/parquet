@@ -26,7 +26,7 @@
 <meta name="twitter:description" content="Du lycée aux chevrons du plafond. 132 pays, une ligue vivante, chaque décision écrit ta légende.">
 <meta name="twitter:image" content="https://parquet-hoop-destiny.vercel.app/assets/og-image.jpg">
 
-<link rel="stylesheet" href="parquet.css">
+<link rel="stylesheet" href="parquet.min.css">
 </head>
 <body>
 
@@ -286,6 +286,16 @@
     </div>
   </section>
 
+  <section id="screen-duel-profile" class="screen screen-pantheon hidden">
+    <div class="pantheon-shell">
+      <header class="pantheon-head">
+        <button id="btn-duel-profile-back" class="btn-icon" aria-label="Retour">←</button>
+        <h2>Profil</h2>
+      </header>
+      <div id="duel-profile-body" class="pantheon-body"></div>
+    </div>
+  </section>
+
   <section id="screen-world-season" class="screen screen-pantheon hidden">
     <div class="pantheon-shell">
       <header class="pantheon-head">
@@ -309,10 +319,9 @@
 
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="bundle.js"></script>
+<!-- Le SDK Firebase (app/auth/database + firebase-config.js) n'est plus
+     chargé ici : DUEL.loadFirebaseSDK() (duel.js) l'injecte à la volée
+     seulement quand le joueur entre dans le monde multijoueur. -->
+<script src="bundle.js" defer></script>
 </body>
 </html>

@@ -1,3 +1,4 @@
 .vercel
 .claude/
 scripts/.env
+node_modules/

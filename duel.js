@@ -65,17 +65,29 @@ DUEL.createCharacter = function (name, positionId) {
   return p;
 };
 
-/* ═══════════════ grade affiché ═══════════════
+/* ═══════════════ rang (façon REP NBA 2K) ═══════════════
    Paliers lisibles au-dessus de la cote numérique — purement cosmétique,
-   ne débloque rien. */
-DUEL.rankLabel = function (rating) {
+   ne débloque rien. Chaque palier a sa couleur et une progression
+   visible vers le suivant (barre affichée par l'UI). */
+DUEL.RANK_TIERS = [
+  { id: "rookie",  label: "Rookie",    min: 0,   max: 100, color: "var(--text-3)" },
+  { id: "starter", label: "Titulaire", min: 100, max: 150, color: "var(--gain)" },
+  { id: "pro",     label: "Pro",       min: 150, max: 200, color: "var(--teal)" },
+  { id: "allstar", label: "All-Star",  min: 200, max: 260, color: "var(--leather)" },
+  { id: "elite",   label: "Élite",     min: 260, max: 320, color: "var(--gold)" },
+  { id: "legend",  label: "Légende",   min: 320, max: Infinity, color: "var(--grape)" },
+];
+
+DUEL.rankInfo = function (rating) {
   const r = rating || 0;
-  if (r >= 260) return "Top classement";
-  if (r >= 200) return "Élite";
-  if (r >= 150) return "Vétéran";
-  if (r >= 100) return "Titulaire";
-  return "Espoir";
+  let tier = DUEL.RANK_TIERS[0], idx = 0;
+  DUEL.RANK_TIERS.forEach((t, i) => { if (r >= t.min) { tier = t; idx = i; } });
+  const next = DUEL.RANK_TIERS[idx + 1];
+  const progress = next ? Math.max(0, Math.min(1, (r - tier.min) / (tier.max - tier.min))) : 1;
+  return { label: tier.label, color: tier.color, progress, next: next ? next.label : null, rating: r };
 };
+
+DUEL.rankLabel = function (rating) { return DUEL.rankInfo(rating).label; };
 
 /* Le coup signature se débloque dès le premier badge — seuil simple,
    ajustable plus tard. Deux usages par match. */
@@ -767,6 +779,32 @@ DUEL.ready = function () {
   return typeof firebase !== "undefined" && typeof FIREBASE_CONFIG !== "undefined" && !!FIREBASE_CONFIG.databaseURL;
 };
 
+/* Le SDK Firebase (3 scripts externes + config) n'est plus chargé au
+   boot du site : il ne sert qu'au monde multijoueur, donc on ne paie
+   son poids que si le joueur y entre vraiment. Chargement séquentiel
+   (firebase-app doit exister avant les compat auth/database) via une
+   promesse mise en cache pour ne le déclencher qu'une fois. */
+DUEL._sdkPromise = null;
+DUEL.loadFirebaseSDK = function () {
+  if (DUEL._sdkPromise) return DUEL._sdkPromise;
+  if (DUEL.ready()) { DUEL._sdkPromise = Promise.resolve(); return DUEL._sdkPromise; }
+  const urls = [
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js",
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js",
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js",
+    "firebase-config.js",
+  ];
+  const loadOne = (src) => new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+  DUEL._sdkPromise = urls.reduce((p, src) => p.then(() => loadOne(src)), Promise.resolve());
+  return DUEL._sdkPromise;
+};
+
 DUEL.initFirebase = function () {
   if (DUEL.db) return;
   if (!DUEL.ready()) throw new Error("Firebase non configuré");
@@ -1030,6 +1068,156 @@ DUEL.sendTaunt = function (text) {
     .set({ text, at: firebase.database.ServerValue.TIMESTAMP });
 };
 
+/* ═══════════════ boutique (jetons + cosmétiques, multijoueur) ═══════════════
+   Monnaie et possessions purement locales (pas de Firebase, pas de
+   nouvelle règle à publier) : des jetons gagnés à chaque match, dépensés
+   sur quatre familles d'objets cosmétiques — thèmes de couleur pour la
+   carte profil, emblèmes affichés à côté du nom, titres, et taunts en
+   plus pour le chambrage. Thèmes/emblèmes/titres s'équipent un par un ;
+   les taunts s'accumulent tous dans le même pool. */
+DUEL.TOKENS_KEY = "mp_tokens_v1";
+DUEL.OWNED_KEY = "mp_owned_v1";
+DUEL.EQUIP_KEYS = { theme: "mp_theme_v1", emblem: "mp_emblem_v1", title: "mp_title_v1" };
+
+DUEL.SHOP_ITEMS = [
+  /* — thèmes de couleur (carte profil) — */
+  { id: "theme-fire",   type: "theme", label: "Thème Feu",      cost: 80,  color: "var(--leather)" },
+  { id: "theme-ice",    type: "theme", label: "Thème Glace",    cost: 80,  color: "var(--teal)" },
+  { id: "theme-blood",  type: "theme", label: "Thème Sang",     cost: 120, color: "var(--loss)" },
+  { id: "theme-night",  type: "theme", label: "Thème Nuit",     cost: 120, color: "#3B5BA5" },
+  { id: "theme-royal",  type: "theme", label: "Thème Royal",    cost: 150, color: "var(--grape)" },
+  { id: "theme-neon",   type: "theme", label: "Thème Néon",     cost: 180, color: "#39FF88" },
+  { id: "theme-pink",   type: "theme", label: "Thème Rose",     cost: 180, color: "#E85CA0" },
+  { id: "theme-gold",   type: "theme", label: "Thème Or",       cost: 220, color: "var(--gold)" },
+  { id: "theme-chrome", type: "theme", label: "Thème Chrome",   cost: 250, color: "#B9C0C6" },
+  { id: "theme-onyx",   type: "theme", label: "Thème Onyx",     cost: 300, color: "#4A433B" },
+
+  /* — emblèmes (affichés à côté du nom) — */
+  { id: "emblem-goat",   type: "emblem", label: "GOAT",       cost: 30, icon: "🐐" },
+  { id: "emblem-fire",   type: "emblem", label: "Feu",        cost: 30, icon: "🔥" },
+  { id: "emblem-bolt",   type: "emblem", label: "Éclair",     cost: 30, icon: "⚡" },
+  { id: "emblem-eagle",  type: "emblem", label: "Aigle",      cost: 40, icon: "🦅" },
+  { id: "emblem-wolf",   type: "emblem", label: "Loup",       cost: 40, icon: "🐺" },
+  { id: "emblem-lion",   type: "emblem", label: "Lion",       cost: 40, icon: "🦁" },
+  { id: "emblem-wave",   type: "emblem", label: "Vague",      cost: 40, icon: "🌊" },
+  { id: "emblem-crown",  type: "emblem", label: "Couronne",   cost: 90, icon: "👑" },
+  { id: "emblem-target", type: "emblem", label: "Précision",  cost: 60, icon: "🎯" },
+  { id: "emblem-gem",    type: "emblem", label: "Diamant",    cost: 90, icon: "💎" },
+  { id: "emblem-snake",  type: "emblem", label: "Serpent",    cost: 50, icon: "🐍" },
+  { id: "emblem-shark",  type: "emblem", label: "Requin",     cost: 60, icon: "🦈" },
+  { id: "emblem-ninja",  type: "emblem", label: "Ninja",      cost: 60, icon: "🥷" },
+  { id: "emblem-skull",  type: "emblem", label: "Tête de mort", cost: 70, icon: "💀" },
+  { id: "emblem-rocket", type: "emblem", label: "Fusée",      cost: 70, icon: "🚀" },
+
+  /* — titres (affichés sous le nom) — */
+  { id: "title-clutch",   type: "title", label: "Le Clutch" ,          cost: 60 },
+  { id: "title-sniper",   type: "title", label: "Sniper" ,             cost: 60 },
+  { id: "title-metro",    type: "title", label: "Le Métronome" ,       cost: 70 },
+  { id: "title-wall",     type: "title", label: "Mur Défensif" ,       cost: 70 },
+  { id: "title-ghost",    type: "title", label: "Fantôme" ,            cost: 80 },
+  { id: "title-prodige",  type: "title", label: "Le Prodige" ,         cost: 80 },
+  { id: "title-king",     type: "title", label: "Roi du Parquet" ,     cost: 130 },
+  { id: "title-tank",     type: "title", label: "L'Increvable" ,       cost: 90 },
+  { id: "title-surgeon",  type: "title", label: "Le Chirurgien" ,      cost: 100 },
+  { id: "title-bucket",   type: "title", label: "Machine à Buckets" ,  cost: 110 },
+
+  /* — taunts (chambrage, Ami / Aléatoire) — */
+  { id: "taunt-1",  type: "taunt", label: "« Ez »",              cost: 40,  text: "Ez 🧊" },
+  { id: "taunt-2",  type: "taunt", label: "« Encore ? »",        cost: 40,  text: "Encore ? 🔁" },
+  { id: "taunt-3",  type: "taunt", label: "« T'es debout ? »",   cost: 60,  text: "T'es encore debout ? 😤" },
+  { id: "taunt-4",  type: "taunt", label: "« GG mais non »",     cost: 60,  text: "GG... mais non 🙃" },
+  { id: "taunt-5",  type: "taunt", label: "« Nice try »",        cost: 50,  text: "Nice try 😏" },
+  { id: "taunt-6",  type: "taunt", label: "« Revanche ? »",      cost: 50,  text: "Tu veux une revanche ? 🔁" },
+  { id: "taunt-7",  type: "taunt", label: "« C'est tout ? »",    cost: 50,  text: "C'est tout ce que t'as ? 🤨" },
+  { id: "taunt-8",  type: "taunt", label: "« Assieds-toi »",     cost: 70,  text: "Assieds-toi 🪑" },
+  { id: "taunt-9",  type: "taunt", label: "« Au suivant »",      cost: 70,  text: "Merci, au suivant 👋" },
+  { id: "taunt-10", type: "taunt", label: "« Régal »",           cost: 60,  text: "Un régal 🍽️" },
+  { id: "taunt-11", type: "taunt", label: "« On refait ça ? »",  cost: 60,  text: "On se refait ça quand tu veux 😌" },
+  { id: "taunt-12", type: "taunt", label: "« Petit joueur »",    cost: 80,  text: "Petit joueur 😴" },
+];
+
+DUEL.getTokens = function () {
+  try { return parseInt(localStorage.getItem(PROFILE.key(DUEL.TOKENS_KEY)) || "0", 10) || 0; }
+  catch (e) { return 0; }
+};
+
+DUEL.addTokens = function (n) {
+  const v = Math.max(0, DUEL.getTokens() + n);
+  try { localStorage.setItem(PROFILE.key(DUEL.TOKENS_KEY), String(v)); } catch (e) {}
+  return v;
+};
+
+DUEL.getOwned = function () {
+  try { return JSON.parse(localStorage.getItem(PROFILE.key(DUEL.OWNED_KEY)) || "[]"); }
+  catch (e) { return []; }
+};
+
+DUEL.isOwned = function (id) { return DUEL.getOwned().includes(id); };
+
+DUEL.getEquipped = function (type) {
+  try { return localStorage.getItem(PROFILE.key(DUEL.EQUIP_KEYS[type])) || "default"; }
+  catch (e) { return "default"; }
+};
+
+DUEL.setEquipped = function (type, id) {
+  try { localStorage.setItem(PROFILE.key(DUEL.EQUIP_KEYS[type]), id); } catch (e) {}
+  DUEL.syncCosmetics();
+};
+
+/* Publie les cosmétiques équipés sur l'entrée du classement (nœud déjà
+   autorisé, aucune règle Firebase supplémentaire à publier) — c'est ce
+   qui permet à un autre joueur de les voir sur ton profil. Best-effort :
+   si ça échoue (hors ligne, pas encore de personnage…), tant pis, le
+   prochain DUEL.recordResult les republiera de toute façon. */
+DUEL.syncCosmetics = function () {
+  if (!DUEL.ready() || !DUEL.uid) return;
+  DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.uid}`).update({
+    theme: DUEL.getEquipped("theme"),
+    emblem: DUEL.getEquipped("emblem"),
+    title: DUEL.getEquipped("title"),
+  }).catch(() => {});
+};
+
+/* alias conservés pour compat (le thème était le premier objet équipable) */
+DUEL.getTheme = function () { return DUEL.getEquipped("theme"); };
+DUEL.setTheme = function (id) { DUEL.setEquipped("theme", id); };
+
+DUEL.themeColorFor = function (id) {
+  const item = DUEL.SHOP_ITEMS.find((i) => i.id === id && i.type === "theme");
+  return item ? item.color : "var(--gain)";
+};
+DUEL.emblemIconFor = function (id) {
+  const item = DUEL.SHOP_ITEMS.find((i) => i.id === id && i.type === "emblem");
+  return item ? item.icon : "";
+};
+DUEL.titleTextFor = function (id) {
+  const item = DUEL.SHOP_ITEMS.find((i) => i.id === id && i.type === "title");
+  return item ? item.label : "";
+};
+
+DUEL.themeColor = function () { return DUEL.themeColorFor(DUEL.getEquipped("theme")); };
+DUEL.emblemIcon = function () { return DUEL.emblemIconFor(DUEL.getEquipped("emblem")); };
+DUEL.titleText = function () { return DUEL.titleTextFor(DUEL.getEquipped("title")); };
+
+DUEL.buyItem = function (id) {
+  const item = DUEL.SHOP_ITEMS.find((i) => i.id === id);
+  if (!item) return { ok: false, msg: "Objet introuvable." };
+  if (DUEL.isOwned(id)) return { ok: false, msg: "Déjà possédé." };
+  if (DUEL.getTokens() < item.cost) return { ok: false, msg: "Pas assez de jetons." };
+  DUEL.addTokens(-item.cost);
+  const owned = DUEL.getOwned();
+  owned.push(id);
+  try { localStorage.setItem(PROFILE.key(DUEL.OWNED_KEY), JSON.stringify(owned)); } catch (e) {}
+  if (DUEL.EQUIP_KEYS[item.type]) DUEL.setEquipped(item.type, id);
+  return { ok: true };
+};
+
+DUEL.availableTaunts = function () {
+  const owned = DUEL.getOwned();
+  const extra = DUEL.SHOP_ITEMS.filter((i) => i.type === "taunt" && owned.includes(i.id)).map((i) => i.text);
+  return DUEL.TAUNTS.concat(extra);
+};
+
 DUEL.leaveRoom = function () {
   if (DUEL._seatsRef) { DUEL._seatsRef.off(); DUEL._seatsRef = null; }
   if (DUEL._roomRef) { DUEL._roomRef.off(); DUEL._roomRef = null; }
@@ -1072,6 +1260,117 @@ DUEL.setAlias = function (name) {
   try { localStorage.setItem(PROFILE.key("duel_alias_v1"), name); } catch (e) {}
 };
 
+/* ═══════════════ unicité des pseudos ═══════════════
+   Registre séparé nom→uid (parquet_names), indépendant du classement
+   qui lui n'existe qu'après un premier match. Transaction Firebase :
+   le nom n'est accordé que si libre ou déjà à moi. */
+DUEL.NAMES_ROOT = "parquet_names";
+
+DUEL.normalizeName = function (name) {
+  return (name || "").trim().toLowerCase();
+};
+
+DUEL.reserveName = function (name, cb) {
+  DUEL.ensureAuth((uid) => {
+    const key = DUEL.normalizeName(name);
+    if (!key) { cb(false, "Entre un nom d'abord."); return; }
+    const prevKey = DUEL.normalizeName(DUEL.getAlias());
+    DUEL.db.ref(`${DUEL.NAMES_ROOT}/${key}`).transaction(
+      (cur) => (cur === null || cur.uid === uid) ? { uid, name } : undefined,
+      (error, committed) => {
+        /* Si le nœud parquet_names n'a pas encore de règles publiées
+           (permission_denied), on n'empêche pas la création du perso —
+           l'unicité redevient simplement best-effort le temps que les
+           règles Firebase soient ajoutées. */
+        if (error) { console.warn("Réservation de pseudo indisponible :", error); cb(true); return; }
+        if (!committed) { cb(false, "Ce nom est déjà pris, choisis-en un autre."); return; }
+        if (prevKey && prevKey !== key) {
+          DUEL.db.ref(`${DUEL.NAMES_ROOT}/${prevKey}`).transaction(
+            (cur) => (cur && cur.uid === uid) ? null : cur
+          );
+        }
+        cb(true);
+      }
+    );
+  });
+};
+
+/* ═══════════════ amis ═══════════════
+   Liste à sens unique par joueur (comme des contacts), résolue via
+   parquet_names — pas besoin que l'autre accepte. Permet de le défier
+   directement : ça crée un salon et dépose une « invitation » dans
+   son propre coin (parquet_challenges), qu'il voit s'il est sur
+   l'accueil du monde multijoueur au même moment. */
+DUEL.FRIENDS_ROOT = "parquet_friends";
+DUEL.CHALLENGES_ROOT = "parquet_challenges";
+DUEL._friendsRef = null;
+DUEL._challengeRef = null;
+
+DUEL.addFriend = function (name, cb) {
+  DUEL.ensureAuth((uid) => {
+    const key = DUEL.normalizeName(name);
+    if (!key) { cb(false, "Entre un pseudo d'abord."); return; }
+    DUEL.db.ref(`${DUEL.NAMES_ROOT}/${key}`).get().then((snap) => {
+      const v = snap.val();
+      if (!v) { cb(false, "Aucun joueur avec ce pseudo."); return; }
+      if (v.uid === uid) { cb(false, "C'est ton propre pseudo."); return; }
+      DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${uid}/${v.uid}`).set({
+        name: v.name, addedAt: firebase.database.ServerValue.TIMESTAMP,
+      }).then(() => cb(true)).catch(() => cb(false, "Erreur réseau, réessaie."));
+    }).catch(() => cb(false, "Erreur réseau, réessaie."));
+  });
+};
+
+DUEL.removeFriend = function (friendUid) {
+  DUEL.ensureAuth((uid) => {
+    DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${uid}/${friendUid}`).remove();
+  });
+};
+
+DUEL.listenFriends = function (cb) {
+  DUEL.ensureAuth((uid) => {
+    if (DUEL._friendsRef) DUEL._friendsRef.off();
+    DUEL._friendsRef = DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${uid}`);
+    DUEL._friendsRef.on("value", (snap) => {
+      const v = snap.val() || {};
+      cb(Object.keys(v).map((fUid) => ({ uid: fUid, name: v[fUid].name })));
+    });
+  });
+};
+
+DUEL.stopListenFriends = function () {
+  if (DUEL._friendsRef) { DUEL._friendsRef.off(); DUEL._friendsRef = null; }
+};
+
+DUEL.challengeFriend = function (friendUid, avatar, cb) {
+  DUEL.ensureAuth((uid) => {
+    DUEL.createRoom(avatar, (code, err) => {
+      if (!code) { cb(null, err); return; }
+      DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${friendUid}`).set({
+        fromUid: uid, fromName: DUEL.getAlias() || ENG.name(avatar), code,
+        at: firebase.database.ServerValue.TIMESTAMP,
+      });
+      cb(code, null);
+    });
+  });
+};
+
+DUEL.listenChallenges = function (cb) {
+  DUEL.ensureAuth((uid) => {
+    if (DUEL._challengeRef) DUEL._challengeRef.off();
+    DUEL._challengeRef = DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${uid}`);
+    DUEL._challengeRef.on("value", (snap) => { const v = snap.val(); if (v) cb(v); });
+  });
+};
+
+DUEL.stopListenChallenges = function () {
+  if (DUEL._challengeRef) { DUEL._challengeRef.off(); DUEL._challengeRef = null; }
+};
+
+DUEL.clearChallenge = function () {
+  DUEL.ensureAuth((uid) => { DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${uid}`).remove(); });
+};
+
 /* ═══════════════ badges (multijoueur uniquement, cosmétique) ═══════════════ */
 DUEL.awardBadge = function (character, id, label) {
   character.badges = character.badges || [];
@@ -1080,26 +1379,56 @@ DUEL.awardBadge = function (character, id, label) {
   return true;
 };
 
+/* Réservé aux vrais matchs contre une autre personne (Ami / Aléatoire) —
+   c'est ce qui alimente le classement public, le rang, les badges à
+   palier et les jetons. Les matchs de Saison (contre l'IA) ne doivent
+   JAMAIS passer par ici : voir DUEL.recordSeasonResult plus bas. */
 DUEL.recordResult = function (won, tie) {
   DUEL.ensureAuth((uid) => {
     const ref = DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${uid}`);
+    const c = DUEL.getCharacter();
     ref.get().then((snap) => {
-      const cur = snap.val() || { name: DUEL.getAlias() || "Joueur", rating: 100, wins: 0, losses: 0 };
+      const cur = snap.val() || { name: DUEL.getAlias() || "Joueur", rating: 100, wins: 0, draws: 0, losses: 0 };
       const delta = tie ? 2 : (won ? 15 : -10);
       const newWins = (cur.wins || 0) + (won ? 1 : 0);
+      const newRating = Math.max(0, (cur.rating || 100) + delta);
       ref.set({
         name: DUEL.getAlias() || cur.name || "Joueur",
-        rating: Math.max(0, (cur.rating || 100) + delta),
+        rating: newRating,
         wins: newWins,
+        draws: (cur.draws || 0) + (tie ? 1 : 0),
         losses: (cur.losses || 0) + (!won && !tie ? 1 : 0),
+        position: c ? c.position : (cur.position || null),
+        ovr: c ? ENG.ovr(c) : (cur.ovr != null ? cur.ovr : null),
+        badges: c && c.badges ? c.badges.map((bd) => bd.label || bd) : (cur.badges || []),
+        theme: DUEL.getEquipped("theme"),
+        emblem: DUEL.getEquipped("emblem"),
+        title: DUEL.getEquipped("title"),
         updatedAt: firebase.database.ServerValue.TIMESTAMP,
       });
+      /* Toujours attribué (même palier bronze) : c'est ce badge, pas
+         le palier affiché plus haut, qui débloque le coup signature
+         via DUEL.signatureUsesForCharacter — voir plus bas. */
       if (newWins >= 10) {
-        const c = DUEL.getCharacter();
         if (c && DUEL.awardBadge(c, "wins10", "10 victoires")) DUEL.setCharacter(c);
       }
+      /* Jetons de boutique : un peu à chaque match, un bonus si le
+         palier de rang change (façon Rep NBA 2K qui récompense la
+         montée de niveau). */
+      let earned = tie ? 5 : (won ? 20 : 5);
+      if (DUEL.rankInfo(cur.rating || 100).label !== DUEL.rankInfo(newRating).label) earned += 50;
+      DUEL.addTokens(earned);
     });
   });
+};
+
+/* Matchs de Saison (contre l'IA) : garde sa propre progression locale
+   (c.season.wins / c.season.losses, déjà tenue à jour ailleurs) et ne
+   touche jamais au classement public, au rang ni aux badges à palier —
+   uniquement quelques jetons, pour que la boutique reste utile en solo
+   aussi. */
+DUEL.recordSeasonResult = function (won) {
+  DUEL.addTokens(won ? 8 : 2);
 };
 
 DUEL.getMyRating = function (cb) {
@@ -1108,6 +1437,60 @@ DUEL.getMyRating = function (cb) {
       const v = snap.val();
       cb(v ? (v.rating || 0) : 100);
     }).catch(() => cb(100));
+  });
+};
+
+/* ═══════════════ badge de victoires à paliers (façon badges 2K) ═══════════════
+   Contrairement aux badges événementiels (Sans-faute, Champion de
+   conférence), celui-ci n'est jamais « attribué » une fois pour
+   toutes : son palier se recalcule à chaque affichage depuis le
+   nombre de victoires actuel. */
+DUEL.WIN_BADGE_TIERS = [
+  { id: "hof",    label: "Hall of Fame", min: 300, color: "var(--grape)" },
+  { id: "gold",   label: "Or",           min: 150, color: "var(--gold)" },
+  { id: "silver", label: "Argent",       min: 50,  color: "var(--g-300)" },
+  { id: "bronze", label: "Bronze",       min: 10,  color: "var(--maple)" },
+];
+
+DUEL.winsBadgeTier = function (wins) {
+  const w = wins || 0;
+  return DUEL.WIN_BADGE_TIERS.find((t) => w >= t.min) || null;
+};
+
+/* ═══════════════ profil consultable ═══════════════
+   Fusionne l'entrée du classement (publique, par uid) avec le
+   personnage local quand c'est le mien — permet de voir son propre
+   profil même avant le tout premier match. */
+DUEL.buildProfile = function (entry, character, fallbackName) {
+  const c = character;
+  return {
+    name: (entry && entry.name) || fallbackName || (c ? ENG.name(c) : "Joueur"),
+    rating: entry ? (entry.rating || 0) : 100,
+    wins: entry ? (entry.wins || 0) : 0,
+    draws: entry ? (entry.draws || 0) : 0,
+    losses: entry ? (entry.losses || 0) : 0,
+    position: (entry && entry.position) || (c ? c.position : null),
+    ovr: (entry && entry.ovr != null) ? entry.ovr : (c ? ENG.ovr(c) : null),
+    badges: (entry && entry.badges) || (c && c.badges ? c.badges.map((bd) => bd.label || bd) : []),
+    theme: (entry && entry.theme) || (c ? DUEL.getEquipped("theme") : "default"),
+    emblem: (entry && entry.emblem) || (c ? DUEL.getEquipped("emblem") : "default"),
+    title: (entry && entry.title) || (c ? DUEL.getEquipped("title") : "default"),
+  };
+};
+
+DUEL.getMyProfile = function (cb) {
+  DUEL.ensureAuth((uid) => {
+    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${uid}`).get().then((snap) => {
+      cb(DUEL.buildProfile(snap.val(), DUEL.getCharacter(), DUEL.getAlias()));
+    }).catch(() => cb(DUEL.buildProfile(null, DUEL.getCharacter(), DUEL.getAlias())));
+  });
+};
+
+DUEL.getProfileByUid = function (uid, fallbackName, cb) {
+  DUEL.ensureAuth(() => {
+    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${uid}`).get().then((snap) => {
+      cb(DUEL.buildProfile(snap.val(), null, fallbackName));
+    }).catch(() => cb(null));
   });
 };
 

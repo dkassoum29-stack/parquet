@@ -150,8 +150,8 @@ DATA.NATIONS = [
     "Culture du poste et du jeu collectif. Un pays qui fabrique des cerveaux.", true),
   N("NG","Nigeria","🇳🇬","afr",    0.54, 0.68, { athleticism:+7, block:+4, three:-4, iq:-2 },
     "Physique d'exception, technique à construire. Le vivier le plus convoité d'Afrique.", true),
-  N("BF","Burkina Faso","🇧🇫","afr",0.30, 0.44, { stamina:+7, durability:+6, perimeterD:+4, three:-4 },
-    "Les Étalons. Peu de salles, des terrains de terre battue, et une endurance forgée sous quarante degrés.", true),
+  N("GR","Grèce","🇬🇷","euro",     0.66, 0.74, { interiorD:+4, rebounding:+3, clutch:+3 },
+    "Salles bouillantes, défense dure, culture du duel. Le pays qui a donné Giannis au monde.", true),
 
   /* — reste de l'Amérique du Nord et Caraïbes — */
   N("CA","Canada","🇨🇦","us",       0.88, 0.75, { handle:+4, three:+2, athleticism:+2 },
@@ -268,8 +268,6 @@ DATA.NATIONS = [
     "Force brute et jeu intérieur assumé."),
   N("FI","Finlande","🇫🇮","euro",  0.46, 0.52, { three:+4, stamina:+3, leadership:+2 },
     "Collectif obstiné et adresse extérieure."),
-  N("GR","Grèce","🇬🇷","euro",     0.66, 0.74, { interiorD:+4, rebounding:+3, clutch:+3 },
-    "Salles bouillantes, défense dure, culture du duel."),
   N("TR","Turquie","🇹🇷","euro",   0.62, 0.68, { finishing:+3, rebounding:+3, leadership:+2 },
     "Championnat solide et public capable de porter ou d'écraser."),
   N("IL","Israël","🇮🇱","euro",    0.58, 0.60, { iq:+4, clutch:+4, perimeterD:+2 },
