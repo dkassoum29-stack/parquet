@@ -819,6 +819,46 @@ DUEL.ensureAuth = function (cb) {
   firebase.auth().signInAnonymously().catch((e) => console.error("Auth duel :", e));
 };
 
+/* ═══════════════ Compte Google ═══════════════
+   Le joueur reste d'abord authentifié anonymement (ensureAuth) : se
+   connecter avec Google ne crée pas un nouveau compte, ça relie
+   l'identité Google à l'uid anonyme déjà utilisé pour son personnage,
+   son classement et ses amis — rien n'est perdu. */
+DUEL.googleLinkedInfo = function () {
+  if (!DUEL.ready() || typeof firebase === "undefined") return null;
+  const u = firebase.auth().currentUser;
+  if (!u) return null;
+  const g = u.providerData.find((p) => p.providerId === "google.com");
+  return g ? { email: g.email, name: g.displayName } : null;
+};
+
+DUEL.linkGoogle = function (cb) {
+  DUEL.ensureAuth(() => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const user = firebase.auth().currentUser;
+    user.linkWithPopup(provider)
+      .then((result) => cb(null, { email: result.user.email, name: result.user.displayName }))
+      .catch((e) => {
+        /* popup bloqué (fréquent sur mobile) : on retente en redirection
+           plein écran — le retour est repris par DUEL.checkGoogleRedirect. */
+        if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") {
+          user.linkWithRedirect(provider);
+          return;
+        }
+        cb(e);
+      });
+  });
+};
+
+/* à appeler une fois le SDK chargé (voir duelOpenLobby) pour récupérer
+   le résultat d'une éventuelle redirection Google laissée en attente. */
+DUEL.checkGoogleRedirect = function (cb) {
+  if (!DUEL.ready() || typeof firebase === "undefined") return;
+  firebase.auth().getRedirectResult()
+    .then((result) => { if (result && result.user && result.credential) cb(null, { email: result.user.email, name: result.user.displayName }); })
+    .catch((e) => cb(e));
+};
+
 DUEL.seatPayload = function (uid, p) {
   return {
     uid, name: ENG.name(p), ovr: ENG.ovr(p), attrs: p.attrs,

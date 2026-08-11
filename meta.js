@@ -63,7 +63,10 @@ META.seen = function (bucket, key) {
   return (m[bucket] && m[bucket][key]) || 0;
 };
 
-META.flush = function () { META.save(META.get()); };
+META.flush = function () {
+  META.save(META.get());
+  if (typeof PROFILE !== "undefined") PROFILE.scheduleCloudPush();
+};
 
 /* ─────────── nouveauté ───────────
    Un coefficient qui multiplie le poids de tirage.

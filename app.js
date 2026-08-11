@@ -28,6 +28,8 @@ function save() {
       calendar: S.calendar, recent: S.recent, teamsSeen: S.teamsSeen,
       log: S.log.slice(-90), pending: S.pending, mp: S.mp,
     }));
+    PROFILE.touchedNow(PROFILE.activeId());
+    PROFILE.scheduleCloudPush();
   } catch (e) { /* quota */ }
 }
 
@@ -50,7 +52,11 @@ function addToPantheon(entry) {
   const list = pantheon();
   list.push(entry);
   list.sort((a, b) => b.score - a.score);
-  try { localStorage.setItem(HALL(), JSON.stringify(list.slice(0, 40))); } catch (e) {}
+  try {
+    localStorage.setItem(HALL(), JSON.stringify(list.slice(0, 40)));
+    PROFILE.touchedNow(PROFILE.activeId());
+    PROFILE.scheduleCloudPush();
+  } catch (e) {}
 }
 
 /* ═══════════════ ÉCRANS ═══════════════ */
@@ -2346,6 +2352,69 @@ function renderProfileChip() {
   $("profile-name").textContent = a ? a.name : "Créer un compte";
 }
 
+/* Carte "Compte Google", réutilisée à l'écran des comptes (entrée du
+   site) et dans l'onglet Profil du monde multijoueur — un seul point
+   de connexion, la même identité sert à la carrière solo et au
+   personnage multijoueur. onDone(result) est appelé après un lien
+   réussi, result venant de PROFILE.reconcileWithCloud (peut être
+   vide si l'appel concerne uniquement le monde multijoueur). */
+function buildGoogleCard(onDone) {
+  const card = el("div", "card duel-mode-card");
+  card.appendChild(el("div", "card-title", "Compte Google"));
+  const statusEl = el("p", "duel-msg", "");
+  card.appendChild(statusEl);
+
+  const info = (typeof DUEL !== "undefined" && DUEL.ready()) ? DUEL.googleLinkedInfo() : null;
+  if (info) {
+    statusEl.textContent = "Connecté avec " + (info.email || info.name || "Google") + ". Ta progression est protégée même si tu changes d'appareil ou vides ton navigateur.";
+    return card;
+  }
+
+  statusEl.textContent = "Relie un compte Google pour retrouver ta carrière, ton personnage multijoueur et tes amis même si tu changes de téléphone ou de navigateur.";
+  const btn = el("button", "btn btn-quiet btn-block", "Se connecter avec Google");
+  btn.onclick = () => {
+    btn.disabled = true; btn.textContent = "Connexion…";
+    DUEL.loadFirebaseSDK().then(() => {
+      DUEL.linkGoogle((err) => {
+        if (err) {
+          btn.disabled = false; btn.textContent = "Se connecter avec Google";
+          if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
+          statusEl.textContent = err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
+            : err.code === "auth/credential-already-in-use" ? "Ce compte Google est déjà relié à un autre profil PARQUET."
+            : "Connexion impossible pour l'instant.";
+          return;
+        }
+        PROFILE.rememberGoogleLinked();
+        btn.textContent = "Synchronisation…";
+        PROFILE.reconcileWithCloud((result) => { onDone && onDone(result); });
+      });
+    });
+  };
+  card.appendChild(btn);
+  return card;
+}
+
+/* Deux appareils peuvent avoir joué sans se resynchroniser entre-temps
+   — plutôt que d'écraser silencieusement l'un des deux, on montre les
+   conflits un par un (motif ask() déjà utilisé partout ailleurs) et on
+   enchaîne jusqu'à ce qu'il n'en reste plus. */
+function resolveGoogleConflicts(result, cb) {
+  if (!result || !result.conflicts || !result.conflicts.length) { cb && cb(); return; }
+  const next = result.conflicts.shift();
+  const fmt = (t) => new Date(t).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  ask({
+    kicker: "Compte Google", head: "Deux versions de « " + (next.name || "ce compte") + " »",
+    body: "Cet appareil a une version du " + fmt(next.localAt) + ", le cloud une version plus récente du " + fmt(next.cloudAt) + ". Laquelle garder ?",
+    chain: false,
+    choices: [
+      { h: "Garder celle-ci (cet appareil)", d: "Écrase la version du cloud.", t: "",
+        pick: () => { setActionEnabled(true); PROFILE.pushToCloud(next.id, () => resolveGoogleConflicts(result, cb)); } },
+      { h: "Charger celle du cloud", d: "Remplace la version de cet appareil.", t: "",
+        pick: () => { setActionEnabled(true); PROFILE.applySnapshot(next.id, next.cSnap); resolveGoogleConflicts(result, cb); } },
+    ],
+  });
+}
+
 function showProfiles(flash) {
   const b = $("profile-body");
   b.innerHTML = "";
@@ -2358,6 +2427,10 @@ function showProfiles(flash) {
     f.textContent = flash;
     b.appendChild(f);
   }
+
+  b.appendChild(buildGoogleCard((result) => {
+    resolveGoogleConflicts(result, () => showProfiles("Compte Google connecté."));
+  }));
 
   const list = PROFILE.list();
   const activeId = PROFILE.activeId();
@@ -2460,6 +2533,31 @@ function boot() {
   $("btn-resume").classList.toggle("hidden", !saved);
   $("boot-careers").textContent = pantheon().length;
   show("screen-boot");
+
+  /* déjà relié à un compte Google sur cet appareil lors d'une session
+     précédente : on se resynchronise discrètement en arrière-plan
+     (comptes créés ailleurs, progression plus récente sur un autre
+     appareil) — pour tout le monde d'autre, ceci ne charge jamais
+     Firebase, comme avant. */
+  if (PROFILE.wasGoogleLinked() && typeof DUEL !== "undefined") {
+    DUEL.loadFirebaseSDK().then(() => {
+      PROFILE.reconcileWithCloud((result) => {
+        if (!result || result.error) return;
+        const onScreenBoot = !$("screen-boot").classList.contains("hidden");
+        if (result.conflicts && result.conflicts.length) {
+          resolveGoogleConflicts(result, () => {
+            renderProfileChip();
+            if (onScreenBoot) { $("btn-resume").classList.toggle("hidden", !loadSave()); $("boot-careers").textContent = pantheon().length; }
+          });
+          return;
+        }
+        if (result.pulled && result.pulled.length) {
+          renderProfileChip();
+          if (onScreenBoot) { $("btn-resume").classList.toggle("hidden", !loadSave()); $("boot-careers").textContent = pantheon().length; }
+        }
+      });
+    });
+  }
 }
 
 function resume() {
@@ -2546,6 +2644,9 @@ function duelOpenLobby() {
     DUEL.listenChallenges((ch) => {
       DUEL_INCOMING_CHALLENGE = ch;
       if ($("duel-lobby-body").dataset.view === "home") worldDrawHome();
+    });
+    DUEL.checkGoogleRedirect((err, info) => {
+      if (info && $("duel-lobby-body").dataset.view === "home") worldDrawHome();
     });
   });
 }
@@ -2809,6 +2910,10 @@ function worldDrawHome() {
   };
   profilCard.appendChild(redoBtn);
   content.appendChild(profilCard);
+
+  content.appendChild(buildGoogleCard((result) => {
+    resolveGoogleConflicts(result, () => worldDrawHome());
+  }));
   }
 
   /* ─── contre un ami ─── */

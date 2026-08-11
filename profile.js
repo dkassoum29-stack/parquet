@@ -119,3 +119,118 @@ PROFILE.hasLegacy = function () {
               localStorage.getItem("parquet_meta_v1"));
   } catch (e) { return false; }
 };
+
+/* ═══════════════════════════════════════════════════════════
+   SYNCHRONISATION CLOUD (compte Google, facultatif)
+   Sans compte Google, tout reste local comme avant — rien ne change.
+   Connecté, chaque compte de cet appareil est copié dans Firebase
+   (parquet_careers/<uid gmail>/<id du compte>), ce qui permet de le
+   retrouver sur un autre appareil connecté au même compte Google.
+   Comparaison par horodatage (updatedAt) : la version la plus récente
+   l'emporte automatiquement, sauf en cas de vrai conflit (les deux
+   appareils ont joué sans se resynchroniser) où on demande à
+   l'utilisateur plutôt que d'effacer silencieusement une progression.
+   S'appuie sur l'auth Firebase déjà en place pour le monde
+   multijoueur (DUEL.ensureAuth/DUEL.db) — même compte, même uid. */
+PROFILE.CLOUD_ROOT = "parquet_careers";
+PROFILE.CLOUD_FLAG = "parquet_google_linked";
+
+PROFILE.rememberGoogleLinked = function () {
+  try { localStorage.setItem(PROFILE.CLOUD_FLAG, "1"); } catch (e) {}
+};
+PROFILE.wasGoogleLinked = function () {
+  try { return localStorage.getItem(PROFILE.CLOUD_FLAG) === "1"; } catch (e) { return false; }
+};
+
+const syncKey = (id) => "parquet_sync_v1__" + id;
+PROFILE.touchedNow = function (id) {
+  try { localStorage.setItem(syncKey(id), String(Date.now())); } catch (e) {}
+};
+PROFILE.lastTouched = function (id) {
+  try { return Number(localStorage.getItem(syncKey(id))) || 0; } catch (e) { return 0; }
+};
+
+/* état local complet d'un compte, prêt à partir vers le cloud */
+PROFILE.snapshot = function (id) {
+  const prof = PROFILE.list().find((p) => p.id === id);
+  if (!prof) return null;
+  let save = null, pantheon = [], meta = null;
+  try { save = JSON.parse(localStorage.getItem("parquet_save_v2__" + id) || "null"); } catch (e) {}
+  try { pantheon = JSON.parse(localStorage.getItem("parquet_pantheon_v2__" + id) || "[]"); } catch (e) {}
+  try { meta = JSON.parse(localStorage.getItem("parquet_meta_v1__" + id) || "null"); } catch (e) {}
+  return { profile: prof, save, pantheon, meta, updatedAt: PROFILE.lastTouched(id) || Date.now() };
+};
+
+/* remplace l'état local d'un compte par un instantané reçu du cloud */
+PROFILE.applySnapshot = function (id, snap) {
+  const list = PROFILE.list();
+  const i = list.findIndex((p) => p.id === id);
+  const prof = Object.assign({}, snap.profile || {}, { id });
+  if (i >= 0) list[i] = prof; else list.push(prof);
+  PROFILE.saveList(list);
+  try {
+    if (snap.save) localStorage.setItem("parquet_save_v2__" + id, JSON.stringify(snap.save));
+    else localStorage.removeItem("parquet_save_v2__" + id);
+    localStorage.setItem("parquet_pantheon_v2__" + id, JSON.stringify(snap.pantheon || []));
+    if (snap.meta) localStorage.setItem("parquet_meta_v1__" + id, JSON.stringify(snap.meta));
+  } catch (e) {}
+  try { localStorage.setItem(syncKey(id), String(snap.updatedAt || Date.now())); } catch (e) {}
+  if (typeof META !== "undefined") META.state = null;
+};
+
+PROFILE.pushToCloud = function (id, cb) {
+  if (typeof DUEL === "undefined" || !DUEL.ready()) { cb && cb(false); return; }
+  DUEL.ensureAuth((uid) => {
+    const snap = PROFILE.snapshot(id);
+    if (!snap) { cb && cb(false); return; }
+    snap.updatedAt = Date.now();
+    DUEL.db.ref(PROFILE.CLOUD_ROOT + "/" + uid + "/" + id).set(snap)
+      .then(() => { PROFILE.touchedNow(id); cb && cb(true); })
+      .catch(() => cb && cb(false));
+  });
+};
+
+/* appelé après chaque écriture locale (save(), Panthéon, mémoire
+   longue) — regroupe les écritures rapprochées en un seul envoi
+   plutôt que de spammer Firebase à chaque situation jouée. */
+let PROFILE_PUSH_T = null;
+PROFILE.scheduleCloudPush = function () {
+  if (!PROFILE.wasGoogleLinked()) return;
+  const id = PROFILE.activeId();
+  if (!id) return;
+  clearTimeout(PROFILE_PUSH_T);
+  PROFILE_PUSH_T = setTimeout(() => PROFILE.pushToCloud(id, () => {}), 2500);
+};
+
+/* Au premier lien (ou à chaque démarrage si déjà lié) : aligne les
+   comptes de cet appareil avec le cloud.
+   - un compte que le cloud seul connaît  -> téléchargé ici
+   - un compte que cet appareil seul connaît -> envoyé au cloud
+   - présent des deux côtés avec une version distante nettement plus
+     récente -> signalé comme conflit, laissé au choix de l'utilisateur
+     (jamais d'écrasement silencieux d'une progression) */
+PROFILE.reconcileWithCloud = function (cb) {
+  if (typeof DUEL === "undefined" || !DUEL.ready()) { cb && cb({ error: "unavailable" }); return; }
+  DUEL.ensureAuth((uid) => {
+    DUEL.db.ref(PROFILE.CLOUD_ROOT + "/" + uid).once("value")
+      .then((snap) => {
+        const cloud = snap.val() || {};
+        const local = PROFILE.list();
+        const pulled = [], pushed = [], conflicts = [];
+
+        Object.keys(cloud).forEach((id) => {
+          const cSnap = cloud[id];
+          const existsLocally = local.some((p) => p.id === id);
+          if (!existsLocally) { PROFILE.applySnapshot(id, cSnap); pulled.push(id); return; }
+          const localAt = PROFILE.lastTouched(id);
+          const cloudAt = cSnap.updatedAt || 0;
+          if (cloudAt > localAt + 2000) conflicts.push({ id, cloudAt, localAt, cSnap, name: cSnap.profile && cSnap.profile.name });
+        });
+
+        local.forEach((p) => { if (!cloud[p.id]) { PROFILE.pushToCloud(p.id, () => {}); pushed.push(p.id); } });
+
+        cb && cb({ pulled, pushed, conflicts });
+      })
+      .catch((e) => cb && cb({ error: e.message }));
+  });
+};

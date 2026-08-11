@@ -108,14 +108,22 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   règles déjà publiées par l'utilisateur.
 - `parquet_names` (registre pseudo→uid pour l'unicité des noms),
   `parquet_friends` (liste d'amis par uid), `parquet_challenges` (défi
-  direct entre amis) : **règles PAS encore publiées** — le code se
-  dégrade proprement en attendant (pseudo non bloqué, ami non ajoutable
-  avec message d'erreur clair), mais il faut ajouter dans la console
-  Firebase (Realtime Database → Règles) :
+  direct entre amis), `parquet_careers` (sauvegarde cloud de la
+  carrière solo par uid, voir section Compte Google) : **règles PAS
+  encore publiées** — le code se dégrade proprement en attendant
+  (pseudo non bloqué, ami non ajoutable avec message d'erreur clair,
+  sync cloud silencieusement inactive), mais il faut ajouter dans la
+  console Firebase (Realtime Database → Règles) :
   ```json
   "parquet_names": { ".read": "auth != null", ".write": "auth != null" },
   "parquet_friends": { ".read": "auth != null", ".write": "auth != null" },
-  "parquet_challenges": { ".read": "auth != null", ".write": "auth != null" }
+  "parquet_challenges": { ".read": "auth != null", ".write": "auth != null" },
+  "parquet_careers": {
+    "$uid": {
+      ".read": "auth != null && auth.uid === $uid",
+      ".write": "auth != null && auth.uid === $uid"
+    }
+  }
   ```
 
 ## Workflow attendu
@@ -138,9 +146,31 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
 - Règles Firebase pour `parquet_names`/`parquet_friends`/`parquet_challenges`
   à publier par l'utilisateur (voir section Firebase ci-dessus) — sans
   ça, pseudo unique et système d'amis restent en dégradé.
-- Compte Google (en plus de l'auth anonyme actuelle) : pas commencé,
-  nécessite que l'utilisateur active le fournisseur Google dans Firebase
-  Auth.
+- Compte Google, y compris pour la carrière solo : code en place.
+  `DUEL.linkGoogle`/`DUEL.googleLinkedInfo`/`DUEL.checkGoogleRedirect`
+  (`duel.js`) relient le compte Google à l'uid anonyme existant
+  (`linkWithPopup`, secours `linkWithRedirect` si popup bloqué) — rien
+  n'est perdu, pas de nouveau compte créé. Le bouton (`buildGoogleCard`
+  dans `app.js`) apparaît à **l'écran des comptes** (entrée du site,
+  `showProfiles()`) et dans l'onglet Profil du monde multijoueur — même
+  identité pour les deux. Connecté, la carrière solo active de chaque
+  compte local est copiée dans `parquet_careers/<uid>/<idCompte>`
+  (`PROFILE.pushToCloud`/`scheduleCloudPush`, débit sur `save()`,
+  `addToPantheon()`, `META.flush()`) pour être retrouvée sur un autre
+  appareil connecté au même compte Google. Résolution par horodatage
+  (`PROFILE.reconcileWithCloud`, appelée au lien et, discrètement, à
+  chaque démarrage si l'appareil a déjà été relié) : le plus récent
+  l'emporte automatiquement, un vrai conflit (deux appareils ont joué
+  sans se resynchroniser) affiche un choix explicite
+  (`resolveGoogleConflicts`) plutôt que d'écraser en silence.
+  Toujours pas fonctionnel : il faut que l'utilisateur active le
+  fournisseur Google dans la console Firebase (Authentication →
+  Sign-in method → Google) **et** publie les règles `parquet_careers`
+  (voir section Firebase ci-dessus). Sans ça, le bouton échoue
+  proprement avec un message clair (`auth/operation-not-allowed`).
+  Non testable de bout en bout depuis l'agent (nécessite un vrai
+  compte Google dans un vrai navigateur, et deux appareils pour
+  vérifier la sync/les conflits).
 - Nouvelle finition de carte profil : 5 propositions visuelles dans un
   artefact (Onyx Élite / Ambre Prestige / Améthyste Royale / Glacier
   Diamant / Opale Galactique, façon tirages 2K MyTEAM), toujours pas
