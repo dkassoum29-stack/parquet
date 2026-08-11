@@ -100,6 +100,23 @@ function teaser(text, isPoster) {
   setTimeout(() => { try { b.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, delay);
 }
 
+/* beat() peut recevoir un `box` (habillage média riche : manchette,
+   SMS, réseau social) sans head/body — S.log ne persiste que des
+   chaînes de texte (voir plus bas), donc à la reprise d'une carrière
+   ces moments réapparaissaient comme des cartes vides. On dérive ici
+   un résumé texte à partir du DOM déjà construit, pour que le journal
+   garde quelque chose de lisible même sans le habillage d'origine. */
+function boxFallback(box) {
+  const q = (sel) => { const n = box.querySelector(sel); return n ? n.textContent.trim() : ""; };
+  const title = q(".headline-title");
+  if (title) return { head: title, body: q(".headline-dek") };
+  const bubble = q(".sms-bubble");
+  if (bubble) { const from = q(".sms-name"); return { head: from ? "Message de " + from : "Message reçu", body: bubble }; }
+  const post = q(".social-text");
+  if (post) return { head: "Réactions en ligne", body: post };
+  return { head: "", body: box.textContent.trim().slice(0, 200) };
+}
+
 function beat(o) {
   const now = Date.now();
   if (now - BATCH_T > 600) BATCH = 0;
@@ -132,7 +149,9 @@ function beat(o) {
       b.appendChild(wrap);
     }
     $("feed").appendChild(b);
-    S.log.push({ kind: o.kind, tag: o.tag, head: o.head, body: o.body,
+    const posterFallback = (!o.head && !o.body && o.box) ? boxFallback(o.box) : null;
+    S.log.push({ kind: o.kind, tag: o.tag, head: o.head || (posterFallback && posterFallback.head) || undefined,
+                 body: o.body || (posterFallback && posterFallback.body) || undefined,
                  when: o.when || S.calendar.label, poster: o.poster });
     setTimeout(() => {
       try { b.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
@@ -158,7 +177,9 @@ function beat(o) {
   }
 
   $("feed").appendChild(b);
-  S.log.push({ kind: o.kind, tag: o.tag, head: o.head, body: o.body, when: o.when || S.calendar.label });
+  const fallback = (!o.head && !o.body && o.box) ? boxFallback(o.box) : null;
+  S.log.push({ kind: o.kind, tag: o.tag, head: o.head || (fallback && fallback.head) || undefined,
+               body: o.body || (fallback && fallback.body) || undefined, when: o.when || S.calendar.label });
 
   /* on suit la cascade : chaque bloc se met en vue au moment où il apparaît */
   const delay = Math.min(rank * step * 1000, cap);
@@ -610,7 +631,7 @@ function renderTrophies() {
   const list = S.p.trophies.slice().reverse();
   if (!list.length) { box.appendChild(el("div", "empty-note", "Aucune distinction pour l'instant.")); return; }
   list.slice(0, 26).forEach((t) => {
-    const d = el("div", "trophy " + (t.cls || ""));
+    const d = el("div", "trophy-chip " + (t.cls || ""));
     d.appendChild(el("span", null, t.icon || "🏅"));
     d.appendChild(el("span", null, t.name));
     d.appendChild(el("b", null, t.year));
@@ -1711,7 +1732,7 @@ function showEnd(score, goat) {
     const counts = {};
     p.trophies.forEach((t) => { counts[t.name] = counts[t.name] || { n: 0, icon: t.icon, cls: t.cls }; counts[t.name].n++; });
     Object.entries(counts).sort((a, b) => b[1].n - a[1].n).forEach(([name, d]) => {
-      const row = el("div", "trophy " + (d.cls || ""));
+      const row = el("div", "trophy-chip " + (d.cls || ""));
       row.appendChild(el("span", null, d.icon));
       row.appendChild(el("span", null, name));
       row.appendChild(el("b", null, "×" + d.n));
@@ -3337,7 +3358,7 @@ function duelRenderMySituation(skipNext) {
   arena.innerHTML = "";
 
   if (mine.lastOutcome) {
-    const panel = el("div", "manga-panel-wrap");
+    const panel = el("div", "manga-panel-wrap manga-panel-recap");
     panel.innerHTML = MANGA.compose(mine.lastOutcome, { offChoice: mine.lastOutcome.mech, framing });
     arena.appendChild(panel);
     const card = el("div", "duel-outcome");
@@ -3430,10 +3451,13 @@ function duelRenderMySituation(skipNext) {
   arena.appendChild(choiceBox);
 
   /* Sur petit écran, le récap de l'action précédente (panneau manga +
-     texte) pousse le compte à rebours hors de l'écran — sans ça, le
-     joueur perd un temps précieux à faire défiler avant de voir qu'il
-     doit choisir. On amène directement le chrono à l'écran. */
-  requestAnimationFrame(() => { timeEl.scrollIntoView({ behavior: "smooth", block: "start" }); });
+     texte) pousse toute la situation suivante hors de l'écran — sans
+     ça, le joueur perd un temps précieux à faire défiler avant de
+     même voir la question. On amène le bloc situation (kicker/titre/
+     texte, juste au-dessus du chrono et des choix) en haut de l'écran,
+     plutôt que le chrono seul : sinon le titre et le texte restent
+     coupés au-dessus du viewport pendant que le temps tourne. */
+  requestAnimationFrame(() => { card.scrollIntoView({ behavior: "smooth", block: "start" }); });
 
   let remain = DUEL.CHOICE_SECONDS;
   DUEL_COUNTDOWN_H = setInterval(() => {
