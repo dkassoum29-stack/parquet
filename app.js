@@ -3357,25 +3357,23 @@ function duelRenderMySituation(skipNext) {
 
   arena.innerHTML = "";
 
+  /* récap compact : juste le résultat, en texte — le panneau manga du
+     choix précédent est déjà passé, pas besoin de le rejouer en petit. */
   if (mine.lastOutcome) {
-    const panel = el("div", "manga-panel-wrap manga-panel-recap");
-    panel.innerHTML = MANGA.compose(mine.lastOutcome, { offChoice: mine.lastOutcome.mech, framing });
-    arena.appendChild(panel);
-    const card = el("div", "duel-outcome");
-    card.appendChild(el("div", "duel-outcome-who", mine.lastOutcome.choiceH));
-    card.appendChild(el("div", "duel-outcome-headline", mine.lastOutcome.headline));
-    card.appendChild(el("div", "duel-outcome-body", mine.lastOutcome.text));
-    arena.appendChild(card);
+    const recap = el("div", "duel-recap");
+    recap.appendChild(el("div", "duel-recap-tag", mine.lastOutcome.choiceH));
+    recap.appendChild(el("div", "duel-recap-headline", mine.lastOutcome.headline));
+    arena.appendChild(recap);
 
     if (DUEL_UI.mode === "online" && mine.lastOutcome.success) {
       DUEL_UI.tauntSentThisRound = false;
       const tauntBox = el("div", "duel-taunts");
-      DUEL.availableTaunts().forEach((text) => {
-        const tbtn = el("button", "duel-taunt-btn", text);
+      DUEL.availableTaunts().forEach((taunt) => {
+        const tbtn = el("button", "duel-taunt-btn", taunt);
         tbtn.onclick = () => {
           if (DUEL_UI.tauntSentThisRound) return;
           DUEL_UI.tauntSentThisRound = true;
-          DUEL.sendTaunt(text);
+          DUEL.sendTaunt(taunt);
           tauntBox.querySelectorAll(".duel-taunt-btn").forEach((x) => { x.disabled = true; });
         };
         tauntBox.appendChild(tbtn);
@@ -3391,15 +3389,20 @@ function duelRenderMySituation(skipNext) {
     return;
   }
 
+  const stage = el("div", "duel-stage");
   const panel = el("div", "manga-panel-wrap");
   panel.innerHTML = MANGA.composeSetup({ framing, label: sc.head });
-  arena.appendChild(panel);
-
-  const tell = DUEL.TELLS.find((t) => t.id === mine.tellId);
-  if (tell && tell.favors) arena.appendChild(el("div", "duel-tell", "👁 " + tell.label));
+  stage.appendChild(panel);
+  arena.appendChild(stage);
 
   const card = el("div", "duel-situation");
-  card.appendChild(el("div", "duel-situation-kicker", "Situation " + (mine.count + 1) + " / " + DUEL_UI.roundsTotal));
+  const kickerRow = el("div", "duel-situation-kicker-row");
+  kickerRow.appendChild(el("span", "duel-situation-kicker", "Situation " + (mine.count + 1) + " / " + DUEL_UI.roundsTotal));
+  const timeEl = el("span", "duel-countdown", String(DUEL.CHOICE_SECONDS));
+  kickerRow.appendChild(timeEl);
+  card.appendChild(kickerRow);
+  const tell = DUEL.TELLS.find((t) => t.id === mine.tellId);
+  if (tell && tell.favors) card.appendChild(el("div", "duel-tell-badge", "👁 " + tell.label));
   card.appendChild(el("div", "duel-situation-head", sc.head));
   card.appendChild(el("div", "duel-situation-body", sc.body));
   arena.appendChild(card);
@@ -3407,9 +3410,6 @@ function duelRenderMySituation(skipNext) {
   if ((mine.mechStreak || 0) >= 2 && mine.lastMech) {
     arena.appendChild(el("p", "duel-fatigue-note", "Fatigue : à force de répéter le même choix, son efficacité baisse."));
   }
-
-  const timeEl = el("div", "duel-countdown", String(DUEL.CHOICE_SECONDS));
-  arena.appendChild(timeEl);
 
   const choiceBox = el("div", "modal-choices");
   let answered = false;
@@ -3450,19 +3450,18 @@ function duelRenderMySituation(skipNext) {
 
   arena.appendChild(choiceBox);
 
-  /* Sur petit écran, le récap de l'action précédente (panneau manga +
-     texte) pousse toute la situation suivante hors de l'écran — sans
-     ça, le joueur perd un temps précieux à faire défiler avant de
-     même voir la question. On amène le bloc situation (kicker/titre/
-     texte, juste au-dessus du chrono et des choix) en haut de l'écran,
-     plutôt que le chrono seul : sinon le titre et le texte restent
-     coupés au-dessus du viewport pendant que le temps tourne. */
-  requestAnimationFrame(() => { card.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  /* Toute la mise en page (voir parquet.css .screen-duel/.duel-arena)
+     est dimensionnée pour tenir dans la hauteur d'écran sans scroll —
+     la scène (panneau manga) est le seul élément qui rétrécit si la
+     place manque. On repart quand même du haut de l'arène par sécurité
+     (ex. reprise après la mi-temps, changement d'orientation). */
+  arena.scrollTop = 0;
 
   let remain = DUEL.CHOICE_SECONDS;
   DUEL_COUNTDOWN_H = setInterval(() => {
     remain--;
     timeEl.textContent = String(Math.max(0, remain));
+    timeEl.classList.toggle("is-low", remain > 0 && remain <= 5);
     if (remain <= 0) {
       duelClearCountdown();
       if (answered) return;
