@@ -150,19 +150,32 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   `DUEL.linkGoogle`/`DUEL.googleLinkedInfo`/`DUEL.checkGoogleRedirect`
   (`duel.js`) relient le compte Google à l'uid anonyme existant
   (`linkWithPopup`, secours `linkWithRedirect` si popup bloqué) — rien
-  n'est perdu, pas de nouveau compte créé. Le bouton (`buildGoogleCard`
-  dans `app.js`) apparaît à **l'écran des comptes** (entrée du site,
-  `showProfiles()`) et dans l'onglet Profil du monde multijoueur — même
-  identité pour les deux. Connecté, la carrière solo active de chaque
-  compte local est copiée dans `parquet_careers/<uid>/<idCompte>`
-  (`PROFILE.pushToCloud`/`scheduleCloudPush`, débit sur `save()`,
-  `addToPantheon()`, `META.flush()`) pour être retrouvée sur un autre
-  appareil connecté au même compte Google. Résolution par horodatage
+  n'est perdu, pas de nouveau compte créé. **Pas d'icône Google
+  séparée** : le compte s'ouvre via le logo 🏀 fixe en haut à droite
+  (`brand-corner` dans `index.html`, câblé dans `app.js` près de la fin
+  de `boot()`/l'init des écrans) — un clic dessus ouvre un tableau de
+  bord (`openAccountMenu` dans `app.js`) avec Accueil / Mes profils /
+  Se connecter avec Google, **depuis n'importe quel écran**, pas
+  seulement l'écran des comptes ou l'onglet Profil du monde
+  multijoueur. Si le compte Google choisi est déjà relié à un autre
+  uid (autre appareil, ou session anonyme précédente sur celui-ci) —
+  cas fréquent, provoquait avant un échec sec sans solution —,
+  `DUEL._adoptExistingCredential` bascule automatiquement dessus via
+  `signInWithCredential` plutôt que d'échouer : c'est une vraie
+  connexion à un compte existant, pas juste un lien à sens unique.
+  Connecté, la carrière solo active de chaque compte local est copiée
+  dans `parquet_careers/<uid>/<idCompte>` (`PROFILE.pushToCloud`/
+  `scheduleCloudPush`, débit sur `save()`, `addToPantheon()`,
+  `META.flush()`) pour être retrouvée sur un autre appareil connecté au
+  même compte Google. Résolution par horodatage
   (`PROFILE.reconcileWithCloud`, appelée au lien et, discrètement, à
   chaque démarrage si l'appareil a déjà été relié) : le plus récent
   l'emporte automatiquement, un vrai conflit (deux appareils ont joué
   sans se resynchroniser) affiche un choix explicite
-  (`resolveGoogleConflicts`) plutôt que d'écraser en silence.
+  (`resolveGoogleConflicts`) plutôt que d'écraser en silence. Chaque
+  étape (connexion en cours, erreur, succès) affiche un message clair
+  et rassurant (`infoDialog` dans `app.js`) — plus jamais un clic qui
+  ne semble rien faire.
   Toujours pas fonctionnel : il faut que l'utilisateur active le
   fournisseur Google dans la console Firebase (Authentication →
   Sign-in method → Google) **et** publie les règles `parquet_careers`
@@ -170,7 +183,9 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   proprement avec un message clair (`auth/operation-not-allowed`).
   Non testable de bout en bout depuis l'agent (nécessite un vrai
   compte Google dans un vrai navigateur, et deux appareils pour
-  vérifier la sync/les conflits).
+  vérifier la sync/les conflits) — le popup Google est aussi bloqué
+  dans le navigateur sandboxé de l'agent (politique de l'organisation
+  sur le domaine accounts.google.com).
 - Nouvelle finition de carte profil : 5 propositions visuelles dans un
   artefact (Onyx Élite / Ambre Prestige / Améthyste Royale / Glacier
   Diamant / Opale Galactique, façon tirages 2K MyTEAM), toujours pas

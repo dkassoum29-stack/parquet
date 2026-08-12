@@ -2349,49 +2349,88 @@ let PF = { emblem: "🏀", name: "" };
 function renderProfileChip() {
   const a = PROFILE.active();
   $("profile-emblem").textContent = a ? a.emblem : "🏀";
-  $("profile-name").textContent = a ? a.name : "Créer un compte";
+  $("profile-name").textContent = a ? a.name : "Créer un profil";
 }
 
-/* Carte "Compte Google", réutilisée à l'écran des comptes (entrée du
-   site) et dans l'onglet Profil du monde multijoueur — un seul point
-   de connexion, la même identité sert à la carrière solo et au
-   personnage multijoueur. onDone(result) est appelé après un lien
-   réussi, result venant de PROFILE.reconcileWithCloud (peut être
+/* Pas d'icône Google séparée sur le site : le compte (seul vrai
+   compte du site — les profils locaux vivent dessous) est accroché
+   au logo 🏀 fixe en haut à droite (`brand-corner`, voir index.html
+   et son onclick plus bas). Sur l'écran des profils et l'onglet
+   Profil du monde multijoueur, ce logo ouvre ce tableau de bord
+   (motif ask() déjà utilisé pour le menu ☰ en jeu) avec les
+   raccourcis Accueil / Mes profils, et la connexion Google seulement
+   si elle n'est pas encore faite. onDone(result) est appelé après un
+   lien réussi, result venant de PROFILE.reconcileWithCloud (peut être
    vide si l'appel concerne uniquement le monde multijoueur). */
-function buildGoogleCard(onDone) {
-  const card = el("div", "card duel-mode-card");
-  card.appendChild(el("div", "card-title", "Compte Google"));
-  const statusEl = el("p", "duel-msg", "");
-  card.appendChild(statusEl);
+function infoDialog(kicker, head, body) {
+  ask({
+    kicker, head, body,
+    cancelable: true, chain: false,
+    choices: [{ h: "OK", d: "", t: "", pick: () => { setActionEnabled(true); } }],
+  });
+}
 
-  const info = (typeof DUEL !== "undefined" && DUEL.ready()) ? DUEL.googleLinkedInfo() : null;
-  if (info) {
-    statusEl.textContent = "Connecté avec " + (info.email || info.name || "Google") + ". Ta progression est protégée même si tu changes d'appareil ou vides ton navigateur.";
-    return card;
-  }
-
-  statusEl.textContent = "Relie un compte Google pour retrouver ta carrière, ton personnage multijoueur et tes amis même si tu changes de téléphone ou de navigateur.";
-  const btn = el("button", "btn btn-quiet btn-block", "Se connecter avec Google");
-  btn.onclick = () => {
-    btn.disabled = true; btn.textContent = "Connexion…";
-    DUEL.loadFirebaseSDK().then(() => {
-      DUEL.linkGoogle((err) => {
-        if (err) {
-          btn.disabled = false; btn.textContent = "Se connecter avec Google";
-          if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
-          statusEl.textContent = err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
-            : err.code === "auth/credential-already-in-use" ? "Ce compte Google est déjà relié à un autre profil PARQUET."
-            : "Connexion impossible pour l'instant.";
-          return;
+function doLinkGoogle(onDone) {
+  /* retour visuel immédiat : le SDK Firebase (chargé paresseusement)
+     et l'ouverture du popup Google prennent parfois une seconde,
+     pendant laquelle l'écran ne bougeait pas — on le dit clairement
+     plutôt que de laisser croire que rien ne se passe. */
+  infoDialog("Compte Google", "Connexion en cours…", "La fenêtre de connexion Google va s'ouvrir — choisis ton compte.");
+  DUEL.loadFirebaseSDK().then(() => {
+    DUEL.linkGoogle((err, info) => {
+      if (err) {
+        if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
+        infoDialog("Compte Google", "Connexion impossible",
+          (err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
+            : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
+            : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
+            : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
+            : "La connexion a échoué, réessaie plus tard.")
+          + " Rien n'est perdu : ta progression reste sur cet appareil.");
+        return;
+      }
+      PROFILE.rememberGoogleLinked();
+      paintBrandCorner();
+      PROFILE.reconcileWithCloud((result) => {
+        /* si un vrai conflit doit être tranché, cet écran-là suffit
+           comme confirmation — sinon on le dit explicitement, pour ne
+           jamais laisser le joueur deviner si ça a marché. */
+        if (!result || !result.conflicts || !result.conflicts.length) {
+          infoDialog("Compte Google", "Connecté avec " + (info.email || info.name || "Google"),
+            "Ta progression est maintenant protégée et synchronisée sur tous tes appareils.");
         }
-        PROFILE.rememberGoogleLinked();
-        btn.textContent = "Synchronisation…";
-        PROFILE.reconcileWithCloud((result) => { onDone && onDone(result); });
+        onDone && onDone(result);
       });
     });
-  };
-  card.appendChild(btn);
-  return card;
+  });
+}
+
+function openAccountMenu(onDone) {
+  const info = (typeof DUEL !== "undefined" && DUEL.ready()) ? DUEL.googleLinkedInfo() : null;
+  const choices = [
+    { h: "Accueil", d: "Retour à l'écran principal.", t: "",
+      pick: () => { setActionEnabled(true); if (S && S.p) save(); boot(); } },
+    { h: "Mes profils", d: "Voir et gérer tes profils de carrière.", t: "",
+      pick: () => { setActionEnabled(true); showProfiles(); } },
+  ];
+  if (!info) {
+    choices.push({ h: "Se connecter avec Google", d: "Retrouve ta carrière et ton personnage multijoueur sur un autre appareil, même si tu l'as déjà relié ailleurs.", t: "",
+      pick: () => { setActionEnabled(true); doLinkGoogle(onDone); } });
+  }
+  ask({
+    kicker: "Compte",
+    head: info ? "Connecté avec " + (info.email || info.name || "Google") : "Pas encore connecté",
+    body: info ? "Ta progression est protégée même si tu changes d'appareil ou vides ton navigateur."
+      : "Un compte Google regroupe tes profils et les retrouve sur n'importe quel appareil. Rien n'est effacé : ta progression actuelle est toujours gardée sur cet appareil, même en cas de souci de connexion.",
+    cancelable: true, chain: false,
+    choices,
+  });
+}
+
+/* Anneau discret autour du logo quand le compte Google est relié. */
+function paintBrandCorner() {
+  const info = (typeof DUEL !== "undefined" && DUEL.ready()) ? DUEL.googleLinkedInfo() : null;
+  $("brand-corner").classList.toggle("is-linked", !!info);
 }
 
 /* Deux appareils peuvent avoir joué sans se resynchroniser entre-temps
@@ -2418,19 +2457,17 @@ function resolveGoogleConflicts(result, cb) {
 function showProfiles(flash) {
   const b = $("profile-body");
   b.innerHTML = "";
-  b.appendChild(el("h1", "create-title", "Comptes"));
+  const head = el("div", "profiles-head");
+  head.appendChild(el("h1", "create-title", "Profils"));
+  b.appendChild(head);
   b.appendChild(el("p", "create-sub",
-    "Chaque compte garde sa carrière en cours, son Panthéon et sa mémoire des situations déjà vues. Tout est stocké sur cet appareil : rien n'est envoyé ailleurs, et aucun mot de passe n'est demandé."));
+    "Chaque profil garde sa carrière en cours, son Panthéon et sa mémoire des situations déjà vues. Connecte ton compte Google (logo 🏀 en haut à droite) pour les retrouver sur un autre appareil."));
 
   if (flash) {
     const f = el("p", "opt-t");
     f.textContent = flash;
     b.appendChild(f);
   }
-
-  b.appendChild(buildGoogleCard((result) => {
-    resolveGoogleConflicts(result, () => showProfiles("Compte Google connecté."));
-  }));
 
   const list = PROFILE.list();
   const activeId = PROFILE.activeId();
@@ -2453,7 +2490,7 @@ function showProfiles(flash) {
       card.appendChild(mid);
 
       const del = el("span", "pc-del", "✕");
-      del.title = "Supprimer ce compte";
+      del.title = "Supprimer ce profil";
       del.onclick = (e) => {
         e.stopPropagation();
         ask({
@@ -2463,7 +2500,7 @@ function showProfiles(flash) {
           choices: [
             { h: "Annuler", d: "", t: "", pick: () => showProfiles() },
             { h: "Supprimer définitivement", d: "", t: "", danger: true,
-              pick: () => { PROFILE.remove(p.id); S = null; renderProfileChip(); showProfiles("Compte supprimé."); } },
+              pick: () => { PROFILE.remove(p.id); S = null; renderProfileChip(); showProfiles("Profil supprimé."); } },
           ],
         });
       };
@@ -2481,10 +2518,10 @@ function showProfiles(flash) {
   }
 
   /* création */
-  b.appendChild(el("h3", "attr-group-name", list.length ? "Nouveau compte" : "Crée ton compte"));
+  b.appendChild(el("h3", "attr-group-name", list.length ? "Nouveau profil" : "Crée ton profil"));
 
   const nameF = el("label", "field");
-  nameF.appendChild(el("span", null, "Nom du compte"));
+  nameF.appendChild(el("span", null, "Nom du profil"));
   const inp = el("input");
   inp.type = "text"; inp.maxLength = 18; inp.placeholder = "Ton pseudo";
   inp.value = PF.name;
@@ -2504,14 +2541,14 @@ function showProfiles(flash) {
   embF.appendChild(grid);
   b.appendChild(embF);
 
-  const go = el("button", "btn btn-accent btn-block", "Créer ce compte");
+  const go = el("button", "btn btn-accent btn-block", "Créer ce profil");
   go.style.marginTop = "6px";
   go.onclick = () => {
     const name = (inp.value || "").trim();
-    if (!name) { showProfiles("Donne un nom à ce compte."); return; }
+    if (!name) { showProfiles("Donne un nom à ce profil."); return; }
     const first = PROFILE.list().length === 0;
     const prof = PROFILE.create(name, PF.emblem);
-    /* les parties jouées avant l'arrivée des comptes rejoignent le premier créé */
+    /* les parties jouées avant l'arrivée des profils rejoignent le premier créé */
     if (first && PROFILE.hasLegacy()) PROFILE.adoptLegacy(prof.id);
     PF = { emblem: "🏀", name: "" };
     S = null;
@@ -2537,11 +2574,14 @@ function boot() {
       DUEL.checkGoogleRedirect((err, info) => {
         if (!info) { bootFinish(); return; }
         PROFILE.rememberGoogleLinked();
+        paintBrandCorner();
         PROFILE.reconcileWithCloud((result) => {
           resolveGoogleConflicts(result, () => {
-            if (!PROFILE.active()) { showProfiles("Compte Google connecté."); return; }
+            if (!PROFILE.active()) { showProfiles("Connecté à ton compte Google."); return; }
             renderProfileChip();
             bootFinish();
+            infoDialog("Compte Google", "Connecté avec " + (info.email || info.name || "Google"),
+              "Ta progression est maintenant protégée et synchronisée sur tous tes appareils.");
           });
         });
       });
@@ -2552,6 +2592,7 @@ function boot() {
 }
 
 function bootFinish() {
+  paintBrandCorner();
   /* pas encore de compte : on commence par là */
   if (!PROFILE.active()) { showProfiles(); return; }
   const saved = loadSave();
@@ -2566,6 +2607,7 @@ function bootFinish() {
      Firebase, comme avant. */
   if (PROFILE.wasGoogleLinked() && typeof DUEL !== "undefined") {
     DUEL.loadFirebaseSDK().then(() => {
+      paintBrandCorner();
       PROFILE.reconcileWithCloud((result) => {
         if (!result || result.error) return;
         const onScreenBoot = !$("screen-boot").classList.contains("hidden");
@@ -2913,7 +2955,9 @@ function worldDrawHome() {
   /* ─── profil ─── */
   if (DUEL_HOME_TAB === "profil") {
   const profilCard = el("div", "card duel-mode-card");
-  profilCard.appendChild(el("div", "card-title", "Profil"));
+  const profilHead = el("div", "profiles-head");
+  profilHead.appendChild(el("div", "card-title", "Profil"));
+  profilCard.appendChild(profilHead);
   const profileBtn = el("button", "btn btn-quiet btn-block", "Voir mon profil complet");
   profileBtn.onclick = () => DUEL.getMyProfile((p) => duelOpenProfile(p, DUEL.getCharacter(), () => { show("screen-duel-lobby"); worldDrawHome(); }, true));
   profilCard.appendChild(profileBtn);
@@ -2935,10 +2979,6 @@ function worldDrawHome() {
   };
   profilCard.appendChild(redoBtn);
   content.appendChild(profilCard);
-
-  content.appendChild(buildGoogleCard((result) => {
-    resolveGoogleConflicts(result, () => worldDrawHome());
-  }));
   }
 
   /* ─── contre un ami ─── */
@@ -4068,14 +4108,25 @@ document.addEventListener("DOMContentLoaded", () => {
   $("btn-profile").onclick = () => showProfiles();
   $("btn-profile-back").onclick = () => boot();
 
-  /* le badge de marque ramène à l'accueil depuis n'importe quel écran ;
-     la partie est sauvegardée avant de sortir, et on ignore le clic si
-     une décision est ouverte pour ne pas la couper au milieu */
+  /* le badge de marque, seul logo du site, est aussi le seul point
+     d'entrée du compte (Accueil / Mes profils / connexion Google —
+     l'icône Google séparée a disparu) : un clic ouvre ce tableau de
+     bord depuis n'importe quel écran, y compris l'écran-titre. On
+     ignore le clic si une décision est ouverte pour ne pas la couper
+     au milieu. */
   $("brand-corner").onclick = () => {
     if (modalOpen()) return;
-    if (S && S.p) save();
-    boot();
+    const onProfilesScreen = !$("screen-profile").classList.contains("hidden");
+    const onDuelProfileTab = !$("screen-duel-lobby").classList.contains("hidden") && DUEL_HOME_TAB === "profil";
+    openAccountMenu((result) => {
+      resolveGoogleConflicts(result, () => {
+        if (onProfilesScreen) { showProfiles("Connecté à ton compte Google."); return; }
+        if (onDuelProfileTab) { worldDrawHome(); return; }
+        renderProfileChip();
+      });
+    });
   };
+  paintBrandCorner();
   $("btn-pantheon-back").onclick = () => (S && S.p && S.phase !== "retired" ? backToGame() : boot());
   $("btn-create-back").onclick = boot;
 

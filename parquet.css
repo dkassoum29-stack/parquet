@@ -284,6 +284,7 @@ button { font: inherit; color: inherit; }
 .brand-corner:hover { opacity: 1; border-color: var(--leather); transform: scale(1.05); }
 .brand-corner:active { transform: scale(.96); }
 .brand-corner .mark { width: 19px; height: 19px; }
+.brand-corner.is-linked { border-color: var(--gain); }
 
 @media (max-width: 560px) {
   .brand-corner { width: 30px; height: 30px; top: 10px; right: 10px; }
@@ -317,6 +318,15 @@ button { font: inherit; color: inherit; }
 .profile-emblem { font-size: 16px; line-height: 1; }
 .profile-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-caret { font-size: 9px; opacity: .6; }
+
+.profiles-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.profiles-head > .create-title,
+.profiles-head > .card-title { margin-bottom: 0; }
 
 .prof-card {
   display: grid;

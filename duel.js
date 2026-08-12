@@ -825,7 +825,12 @@ DUEL.ensureAuth = function (cb) {
    l'identité Google à l'uid anonyme déjà utilisé pour son personnage,
    son classement et ses amis — rien n'est perdu. */
 DUEL.googleLinkedInfo = function () {
-  if (!DUEL.ready() || typeof firebase === "undefined") return null;
+  /* le logo 🏀 (compte) peut être cliqué avant même que le SDK
+     Firebase soit chargé (il est lazy, voir loadFirebaseSDK) : à ce
+     stade `firebase` peut exister sans qu'aucune app par défaut ne
+     soit encore initialisée, et firebase.auth() lève alors une
+     exception plutôt que de renvoyer un état vide. */
+  if (!DUEL.ready() || typeof firebase === "undefined" || !firebase.apps || !firebase.apps.length) return null;
   const u = firebase.auth().currentUser;
   if (!u) return null;
   const g = u.providerData.find((p) => p.providerId === "google.com");
@@ -848,6 +853,23 @@ DUEL._isSafariLike = function () {
 
 DUEL.REDIRECT_PENDING_KEY = "parquet_google_redirect_pending";
 
+/* Ce compte Google est déjà relié à un autre uid Firebase — un autre
+   appareil, ou une session anonyme antérieure sur celui-ci — donc le
+   lien échoue avec credential-already-in-use. Plutôt que de laisser
+   le joueur bloqué sans solution (« il n'y a pas moyen de se
+   connecter à un compte existant »), on bascule directement dessus :
+   Firebase fournit le credential Google déjà validé sur l'erreur, il
+   suffit de s'y connecter avec pour adopter cet uid existant.
+   reconcileWithCloud (appelé juste après par l'appelant) rapatriera
+   ensuite ses carrières sur cet appareil, avec le même mécanisme de
+   fusion par horodatage qu'une resynchro multi-appareils normale. */
+DUEL._adoptExistingCredential = function (e, cb) {
+  if (e.code !== "auth/credential-already-in-use" || !e.credential) { cb(e); return; }
+  firebase.auth().signInWithCredential(e.credential)
+    .then((result) => { DUEL.uid = result.user.uid; cb(null, { email: result.user.email, name: result.user.displayName, switched: true }); })
+    .catch((e2) => cb(e2));
+};
+
 DUEL.linkGoogle = function (cb) {
   DUEL.ensureAuth(() => {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -867,7 +889,7 @@ DUEL.linkGoogle = function (cb) {
           user.linkWithRedirect(provider);
           return;
         }
-        cb(e);
+        DUEL._adoptExistingCredential(e, cb);
       });
   });
 };
@@ -877,6 +899,7 @@ DUEL.linkGoogle = function (cb) {
    en attente. */
 DUEL.checkGoogleRedirect = function (cb) {
   if (!DUEL.ready() || typeof firebase === "undefined") return;
+  DUEL.initFirebase();
   firebase.auth().getRedirectResult()
     .then((result) => {
       try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (e) {}
@@ -884,7 +907,7 @@ DUEL.checkGoogleRedirect = function (cb) {
     })
     .catch((e) => {
       try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (er) {}
-      cb(e);
+      DUEL._adoptExistingCredential(e, cb);
     });
 };
 
