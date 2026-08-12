@@ -2376,18 +2376,23 @@ function doLinkGoogle(onDone) {
      pendant laquelle l'écran ne bougeait pas — on le dit clairement
      plutôt que de laisser croire que rien ne se passe. */
   infoDialog("Compte Google", "Connexion en cours…", "La fenêtre de connexion Google va s'ouvrir — choisis ton compte.");
+  const fail = (label) => infoDialog("Compte Google", "Connexion impossible",
+    label + " Rien n'est perdu : ta progression reste sur cet appareil.");
   DUEL.loadFirebaseSDK().then(() => {
+    /* si un des scripts externes (gstatic.com) n'a pas pu se charger —
+       bloqueur de pub, réseau, etc. — DUEL.ready() reste faux : sans
+       ce garde-fou, l'appel plus bas plante en silence et la fenêtre
+       « Connexion en cours… » reste affichée pour rien, indéfiniment. */
+    if (!DUEL.ready()) { fail("Le service de connexion n'a pas pu se charger (bloqueur de pub ou réseau ?)."); return; }
     DUEL.linkGoogle((err, info) => {
       if (err) {
         if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
-        infoDialog("Compte Google", "Connexion impossible",
-          (err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
-            : err.code === "auth/unauthorized-domain" ? "Ce site n'est pas encore autorisé pour la connexion Google (domaine à ajouter côté Firebase)."
-            : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
-            : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
-            : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
-            : "La connexion a échoué" + (err.code ? " (" + err.code + ")" : "") + ", réessaie plus tard.")
-          + " Rien n'est perdu : ta progression reste sur cet appareil.");
+        fail(err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
+          : err.code === "auth/unauthorized-domain" ? "Ce site n'est pas encore autorisé pour la connexion Google (domaine à ajouter côté Firebase)."
+          : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
+          : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
+          : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
+          : "La connexion a échoué" + (err.code ? " (" + err.code + ")" : "") + ", réessaie plus tard.");
         return;
       }
       PROFILE.rememberGoogleLinked();
@@ -2403,7 +2408,7 @@ function doLinkGoogle(onDone) {
         onDone && onDone(result);
       });
     });
-  });
+  }).catch((e) => { fail("Une erreur inattendue a bloqué la connexion" + (e && e.message ? " (" + e.message + ")" : "") + "."); });
 }
 
 function openAccountMenu(onDone) {

@@ -812,11 +812,16 @@ DUEL.initFirebase = function () {
   DUEL.db = firebase.database();
 };
 
-DUEL.ensureAuth = function (cb) {
+/* onError optionnel : si l'auth anonyme de base échoue, la plupart des
+   appelants (salons, classement…) n'ont rien de mieux à faire que
+   réessayer plus tard donc l'ignorent — mais DUEL.linkGoogle en a
+   besoin pour ne pas laisser le joueur devant une fenêtre « Connexion
+   en cours… » qui ne se refermera jamais. */
+DUEL.ensureAuth = function (cb, onError) {
   DUEL.initFirebase();
   if (DUEL.uid) { cb(DUEL.uid); return; }
   firebase.auth().onAuthStateChanged((u) => { if (u) { DUEL.uid = u.uid; cb(u.uid); } });
-  firebase.auth().signInAnonymously().catch((e) => console.error("Auth duel :", e));
+  firebase.auth().signInAnonymously().catch((e) => { console.error("Auth duel :", e); onError && onError(e); });
 };
 
 /* ═══════════════ Compte Google ═══════════════
@@ -882,8 +887,9 @@ DUEL.linkGoogle = function (cb) {
     user.linkWithPopup(provider)
       .then((result) => cb(null, { email: result.user.email, name: result.user.displayName }))
       .catch((e) => {
-        /* popup bloqué (fréquent sur mobile) : on retente en redirection
-           plein écran — le retour est repris par DUEL.checkGoogleRedirect. */
+        /* popup bloqué (fréquent sur mobile ou par un bloqueur de pub) :
+           on retente en redirection plein écran — le retour est repris
+           par DUEL.checkGoogleRedirect. */
         if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") {
           try { localStorage.setItem(DUEL.REDIRECT_PENDING_KEY, "1"); } catch (er) {}
           user.linkWithRedirect(provider);
@@ -891,19 +897,28 @@ DUEL.linkGoogle = function (cb) {
         }
         DUEL._adoptExistingCredential(e, cb);
       });
-  });
+  }, (e) => cb(e));
 };
 
 /* à appeler une fois le SDK chargé (voir duelOpenLobby et boot()) pour
    récupérer le résultat d'une éventuelle redirection Google laissée
    en attente. */
 DUEL.checkGoogleRedirect = function (cb) {
-  if (!DUEL.ready() || typeof firebase === "undefined") return;
+  /* appelé au boot dès qu'une redirection est en attente (voir boot()) :
+     l'appelant compte sur cb() pour savoir quand continuer — s'il n'est
+     jamais rappelé, l'écran-titre ne s'affiche jamais et l'appareil
+     reste bloqué sur une page blanche après le retour de Google. Donc
+     TOUJOURS rappeler cb, y compris quand il n'y a rien à signaler. */
+  if (!DUEL.ready() || typeof firebase === "undefined") { cb(null, null); return; }
   DUEL.initFirebase();
   firebase.auth().getRedirectResult()
     .then((result) => {
       try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (e) {}
-      if (result && result.user && result.credential) cb(null, { email: result.user.email, name: result.user.displayName });
+      /* .credential n'est pas fiable sur tous les navigateurs/versions
+         du SDK pour repérer un retour réussi — un .user suffit : c'est
+         justement lui qu'on veut (uid + email/nom Google). */
+      if (result && result.user) { DUEL.uid = result.user.uid; cb(null, { email: result.user.email, name: result.user.displayName }); return; }
+      cb(null, null);
     })
     .catch((e) => {
       try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (er) {}
