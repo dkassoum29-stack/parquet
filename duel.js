@@ -875,13 +875,25 @@ DUEL._adoptExistingCredential = function (e, cb) {
     .catch((e2) => cb(e2));
 };
 
+/* linkWithRedirect() renvoie une promesse qui peut être rejetée AVANT
+   même la navigation (domaine non autorisé, config invalide…) : sans
+   .catch, cette erreur était avalée en silence — la marque « redirection
+   en attente » restait posée dans localStorage, on ne navigue nulle
+   part, et l'écran reste bloqué sur « Connexion en cours… » pour rien. */
+DUEL._redirectGoogle = function (provider, user, cb) {
+  user.linkWithRedirect(provider).catch((e) => {
+    try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (er) {}
+    cb(e);
+  });
+};
+
 DUEL.linkGoogle = function (cb) {
   DUEL.ensureAuth(() => {
     const provider = new firebase.auth.GoogleAuthProvider();
     const user = firebase.auth().currentUser;
     if (DUEL._isSafariLike()) {
       try { localStorage.setItem(DUEL.REDIRECT_PENDING_KEY, "1"); } catch (e) {}
-      user.linkWithRedirect(provider);
+      DUEL._redirectGoogle(provider, user, cb);
       return;
     }
     user.linkWithPopup(provider)
@@ -892,7 +904,7 @@ DUEL.linkGoogle = function (cb) {
            par DUEL.checkGoogleRedirect. */
         if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") {
           try { localStorage.setItem(DUEL.REDIRECT_PENDING_KEY, "1"); } catch (er) {}
-          user.linkWithRedirect(provider);
+          DUEL._redirectGoogle(provider, user, cb);
           return;
         }
         DUEL._adoptExistingCredential(e, cb);
