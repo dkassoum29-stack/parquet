@@ -2370,29 +2370,35 @@ function infoDialog(kicker, head, body) {
   });
 }
 
+function googleErrorLabel(err) {
+  return err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
+    : err.code === "auth/unauthorized-domain" ? "Ce site n'est pas encore autorisé pour la connexion Google (domaine à ajouter côté Firebase)."
+    : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
+    : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
+    : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
+    : "La connexion a échoué" + (err.code ? " (" + err.code + ")" : "") + ", réessaie plus tard.";
+}
+
+function googleFailDialog(label) {
+  infoDialog("Compte Google", "Connexion impossible", label + " Rien n'est perdu : ta progression reste sur cet appareil.");
+}
+
 function doLinkGoogle(onDone) {
   /* retour visuel immédiat : le SDK Firebase (chargé paresseusement)
      et l'ouverture du popup Google prennent parfois une seconde,
      pendant laquelle l'écran ne bougeait pas — on le dit clairement
      plutôt que de laisser croire que rien ne se passe. */
   infoDialog("Compte Google", "Connexion en cours…", "La fenêtre de connexion Google va s'ouvrir — choisis ton compte.");
-  const fail = (label) => infoDialog("Compte Google", "Connexion impossible",
-    label + " Rien n'est perdu : ta progression reste sur cet appareil.");
   DUEL.loadFirebaseSDK().then(() => {
     /* si un des scripts externes (gstatic.com) n'a pas pu se charger —
        bloqueur de pub, réseau, etc. — DUEL.ready() reste faux : sans
        ce garde-fou, l'appel plus bas plante en silence et la fenêtre
        « Connexion en cours… » reste affichée pour rien, indéfiniment. */
-    if (!DUEL.ready()) { fail("Le service de connexion n'a pas pu se charger (bloqueur de pub ou réseau ?)."); return; }
+    if (!DUEL.ready()) { googleFailDialog("Le service de connexion n'a pas pu se charger (bloqueur de pub ou réseau ?)."); return; }
     DUEL.linkGoogle((err, info) => {
       if (err) {
         if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
-        fail(err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
-          : err.code === "auth/unauthorized-domain" ? "Ce site n'est pas encore autorisé pour la connexion Google (domaine à ajouter côté Firebase)."
-          : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
-          : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
-          : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
-          : "La connexion a échoué" + (err.code ? " (" + err.code + ")" : "") + ", réessaie plus tard.");
+        googleFailDialog(googleErrorLabel(err));
         return;
       }
       PROFILE.rememberGoogleLinked();
@@ -2408,7 +2414,7 @@ function doLinkGoogle(onDone) {
         onDone && onDone(result);
       });
     });
-  }).catch((e) => { fail("Une erreur inattendue a bloqué la connexion" + (e && e.message ? " (" + e.message + ")" : "") + "."); });
+  }).catch((e) => { googleFailDialog("Une erreur inattendue a bloqué la connexion" + (e && e.message ? " (" + e.message + ")" : "") + "."); });
 }
 
 function openAccountMenu(onDone) {
@@ -2578,7 +2584,18 @@ function boot() {
   if (pendingGoogle) {
     DUEL.loadFirebaseSDK().then(() => {
       DUEL.checkGoogleRedirect((err, info) => {
-        if (!info) { bootFinish(); return; }
+        if (!info) {
+          bootFinish();
+          /* on a bien envoyé le joueur vers Google (la marque « en
+             attente » était posée) mais rien n'est revenu de ce côté :
+             au lieu de laisser croire que le clic n'a rien fait, on le
+             dit précisément — err donne la vraie cause si Firebase en a
+             signalé une, sinon c'est le résultat qui s'est perdu en
+             route (protection anti-traçage de Safari, le plus souvent). */
+          googleFailDialog(err ? googleErrorLabel(err)
+            : "Le retour de connexion Google s'est perdu en chemin (souvent lié aux protections de confidentialité de Safari).");
+          return;
+        }
         PROFILE.rememberGoogleLinked();
         paintBrandCorner();
         PROFILE.reconcileWithCloud((result) => {
