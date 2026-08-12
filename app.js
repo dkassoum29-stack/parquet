@@ -2373,6 +2373,7 @@ function infoDialog(kicker, head, body) {
 function googleErrorLabel(err) {
   return err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
     : err.code === "auth/unauthorized-domain" ? "Ce site n'est pas encore autorisé pour la connexion Google (domaine à ajouter côté Firebase)."
+    : err.code === "auth/popup-blocked" ? "La fenêtre Google a été bloquée par le navigateur — autorise les popups pour ce site et réessaie."
     : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
     : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
     : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
@@ -2384,17 +2385,7 @@ function googleFailDialog(label) {
 }
 
 function doLinkGoogle(onDone) {
-  /* retour visuel immédiat : le SDK Firebase (chargé paresseusement)
-     et l'ouverture du popup Google prennent parfois une seconde,
-     pendant laquelle l'écran ne bougeait pas — on le dit clairement
-     plutôt que de laisser croire que rien ne se passe. */
-  infoDialog("Compte Google", "Connexion en cours…", "La fenêtre de connexion Google va s'ouvrir — choisis ton compte.");
-  DUEL.loadFirebaseSDK().then(() => {
-    /* si un des scripts externes (gstatic.com) n'a pas pu se charger —
-       bloqueur de pub, réseau, etc. — DUEL.ready() reste faux : sans
-       ce garde-fou, l'appel plus bas plante en silence et la fenêtre
-       « Connexion en cours… » reste affichée pour rien, indéfiniment. */
-    if (!DUEL.ready()) { googleFailDialog("Le service de connexion n'a pas pu se charger (bloqueur de pub ou réseau ?)."); return; }
+  const finishLink = () => {
     DUEL.linkGoogle((err, info) => {
       if (err) {
         if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
@@ -2414,6 +2405,21 @@ function doLinkGoogle(onDone) {
         onDone && onDone(result);
       });
     });
+  };
+  /* si tout est déjà préchargé (voir openAccountMenu, lancé dès
+     l'ouverture du menu Compte), on reste dans le même tick que le
+     clic du joueur — indispensable pour que la fenêtre Google
+     s'ouvre sans être bloquée par Safari. Sinon, secours avec retour
+     visuel pendant le chargement. */
+  if (DUEL.ready() && DUEL._gisReady()) { finishLink(); return; }
+  infoDialog("Compte Google", "Connexion en cours…", "La fenêtre de connexion Google va s'ouvrir — choisis ton compte.");
+  Promise.all([DUEL.loadFirebaseSDK(), DUEL.loadGoogleIdentity()]).then(() => {
+    /* si un des scripts externes n'a pas pu se charger — bloqueur de
+       pub, réseau, etc. — sans ce garde-fou, l'appel plus bas plante
+       en silence et la fenêtre « Connexion en cours… » reste affichée
+       pour rien, indéfiniment. */
+    if (!DUEL.ready() || !DUEL._gisReady()) { googleFailDialog("Le service de connexion n'a pas pu se charger (bloqueur de pub ou réseau ?)."); return; }
+    finishLink();
   }).catch((e) => { googleFailDialog("Une erreur inattendue a bloqué la connexion" + (e && e.message ? " (" + e.message + ")" : "") + "."); });
 }
 
@@ -2426,6 +2432,14 @@ function openAccountMenu(onDone) {
       pick: () => { setActionEnabled(true); showProfiles(); } },
   ];
   if (!info) {
+    /* précharge en tâche de fond dès que le menu s'ouvre (SDK Firebase,
+       Google Identity Services, et l'auth anonyme) : le temps que le
+       joueur lise le menu et appuie sur "Se connecter", tout est déjà
+       prêt — le clic peut ouvrir la fenêtre Google immédiatement, sans
+       quoi le délai de chargement ferait perdre le geste utilisateur
+       et Safari bloquerait la fenêtre. */
+    DUEL.loadFirebaseSDK().then(() => { if (DUEL.ready()) DUEL.ensureAuth(() => {}); });
+    DUEL.loadGoogleIdentity();
     choices.push({ h: "Se connecter avec Google", d: "Retrouve ta carrière et ton personnage multijoueur sur un autre appareil, même si tu l'as déjà relié ailleurs.", t: "",
       pick: () => { setActionEnabled(true); doLinkGoogle(onDone); } });
   }
@@ -2576,41 +2590,6 @@ function showProfiles(flash) {
 
 function boot() {
   renderProfileChip();
-  /* retour d'une connexion Google en redirection plein écran (Safari) :
-     avant tout le reste, on va chercher son résultat pendant que le
-     SDK est encore froid, sinon il est perdu pour de bon. */
-  let pendingGoogle = false;
-  try { pendingGoogle = typeof DUEL !== "undefined" && localStorage.getItem(DUEL.REDIRECT_PENDING_KEY) === "1"; } catch (e) {}
-  if (pendingGoogle) {
-    DUEL.loadFirebaseSDK().then(() => {
-      DUEL.checkGoogleRedirect((err, info) => {
-        if (!info) {
-          bootFinish();
-          /* on a bien envoyé le joueur vers Google (la marque « en
-             attente » était posée) mais rien n'est revenu de ce côté :
-             au lieu de laisser croire que le clic n'a rien fait, on le
-             dit précisément — err donne la vraie cause si Firebase en a
-             signalé une, sinon c'est le résultat qui s'est perdu en
-             route (protection anti-traçage de Safari, le plus souvent). */
-          googleFailDialog(err ? googleErrorLabel(err)
-            : "Le retour de connexion Google s'est perdu en chemin (souvent lié aux protections de confidentialité de Safari).");
-          return;
-        }
-        PROFILE.rememberGoogleLinked();
-        paintBrandCorner();
-        PROFILE.reconcileWithCloud((result) => {
-          resolveGoogleConflicts(result, () => {
-            if (!PROFILE.active()) { showProfiles("Connecté à ton compte Google."); return; }
-            renderProfileChip();
-            bootFinish();
-            infoDialog("Compte Google", "Connecté avec " + (info.email || info.name || "Google"),
-              "Ta progression est maintenant protégée et synchronisée sur tous tes appareils.");
-          });
-        });
-      });
-    });
-    return;
-  }
   bootFinish();
 }
 
@@ -2734,9 +2713,6 @@ function duelOpenLobby() {
     DUEL.listenChallenges((ch) => {
       DUEL_INCOMING_CHALLENGE = ch;
       if ($("duel-lobby-body").dataset.view === "home") worldDrawHome();
-    });
-    DUEL.checkGoogleRedirect((err, info) => {
-      if (info && $("duel-lobby-body").dataset.view === "home") worldDrawHome();
     });
   });
 }

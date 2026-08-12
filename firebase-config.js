@@ -25,3 +25,13 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "321612677309",
   appId: "1:321612677309:web:6d7efb18af2956c4feb7d4",
 };
+
+/* Web client ID OAuth (Firebase Console → Authentication → Sign-in
+   method → Google → Configuration du SDK web, ou Google Cloud Console
+   → Identifiants). Sert à Google Identity Services (voir duel.js,
+   DUEL.linkGoogle) pour obtenir un jeton Google en direct depuis
+   accounts.google.com, sans jamais passer par le domaine
+   parquet-duel.firebaseapp.com — c'est ce détour que Safari (ITP)
+   bloquait et qui rendait la connexion impossible sur iPhone. Pas
+   secret non plus (même statut que FIREBASE_CONFIG ci-dessus). */
+const GOOGLE_WEB_CLIENT_ID = "321612677309-02esjvfu7bek8jogp6kjp7eiqmrjo3e5.apps.googleusercontent.com";

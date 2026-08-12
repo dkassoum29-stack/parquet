@@ -842,22 +842,6 @@ DUEL.googleLinkedInfo = function () {
   return g ? { email: g.email, name: g.displayName } : null;
 };
 
-/* Sur Safari (iOS et Mac), la protection anti-traçage (ITP) bloque
-   souvent l'accès au storage tiers dont linkWithPopup a besoin pour
-   relayer le résultat : le sélecteur de compte Google s'affiche, le
-   joueur choisit un compte, puis Firebase rapporte à tort un
-   auth/popup-closed-by-user et tout s'arrête sans message. On évite
-   complètement le popup sur ces navigateurs et on part direct en
-   redirection plein écran, bien plus fiable là-bas. */
-DUEL._isSafariLike = function () {
-  const ua = (navigator.userAgent || "");
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
-  const isSafari = /^((?!chrome|crios|fxios|android).)*safari/i.test(ua);
-  return isIOS || isSafari;
-};
-
-DUEL.REDIRECT_PENDING_KEY = "parquet_google_redirect_pending";
-
 /* Ce compte Google est déjà relié à un autre uid Firebase — un autre
    appareil, ou une session anonyme antérieure sur celui-ci — donc le
    lien échoue avec credential-already-in-use. Plutôt que de laisser
@@ -875,67 +859,62 @@ DUEL._adoptExistingCredential = function (e, cb) {
     .catch((e2) => cb(e2));
 };
 
-/* linkWithRedirect() renvoie une promesse qui peut être rejetée AVANT
-   même la navigation (domaine non autorisé, config invalide…) : sans
-   .catch, cette erreur était avalée en silence — la marque « redirection
-   en attente » restait posée dans localStorage, on ne navigue nulle
-   part, et l'écran reste bloqué sur « Connexion en cours… » pour rien. */
-DUEL._redirectGoogle = function (provider, user, cb) {
-  user.linkWithRedirect(provider).catch((e) => {
-    try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (er) {}
-    cb(e);
+/* Google Identity Services (accounts.google.com/gsi/client), chargé à
+   la demande comme le SDK Firebase. Remplace linkWithPopup/
+   linkWithRedirect : ceux-ci passent par le domaine de connexion de
+   Firebase (parquet-duel.firebaseapp.com), un détour que la protection
+   anti-traçage de Safari bloque sur iPhone (popup ET redirection étaient
+   concernées, confirmé en usage réel) — le résultat de connexion se
+   perdait en route sans jamais revenir. GIS parle en direct avec
+   accounts.google.com, sans repasser par ce domaine intermédiaire. */
+DUEL._gisPromise = null;
+DUEL.loadGoogleIdentity = function () {
+  if (DUEL._gisPromise) return DUEL._gisPromise;
+  if (typeof google !== "undefined" && google.accounts && google.accounts.oauth2) {
+    DUEL._gisPromise = Promise.resolve(true);
+    return DUEL._gisPromise;
+  }
+  DUEL._gisPromise = new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
   });
+  return DUEL._gisPromise;
+};
+DUEL._gisReady = function () {
+  return typeof google !== "undefined" && !!(google.accounts && google.accounts.oauth2);
 };
 
+/* La fenêtre Google (requestAccessToken) doit s'ouvrir dans le même
+   tick que le clic du joueur pour ne pas être bloquée par Safari —
+   c'est pourquoi openAccountMenu() précharge le SDK Firebase, GIS et
+   l'auth anonyme dès l'ouverture du menu Compte, pas seulement au
+   clic sur "Se connecter". */
 DUEL.linkGoogle = function (cb) {
+  if (typeof GOOGLE_WEB_CLIENT_ID === "undefined" || !GOOGLE_WEB_CLIENT_ID) { cb({ code: "auth/operation-not-allowed" }); return; }
+  if (!DUEL._gisReady()) { cb({ code: "auth/internal-error", message: "Google Identity Services non chargé" }); return; }
   DUEL.ensureAuth(() => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    const user = firebase.auth().currentUser;
-    if (DUEL._isSafariLike()) {
-      try { localStorage.setItem(DUEL.REDIRECT_PENDING_KEY, "1"); } catch (e) {}
-      DUEL._redirectGoogle(provider, user, cb);
-      return;
-    }
-    user.linkWithPopup(provider)
-      .then((result) => cb(null, { email: result.user.email, name: result.user.displayName }))
-      .catch((e) => {
-        /* popup bloqué (fréquent sur mobile ou par un bloqueur de pub) :
-           on retente en redirection plein écran — le retour est repris
-           par DUEL.checkGoogleRedirect. */
-        if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") {
-          try { localStorage.setItem(DUEL.REDIRECT_PENDING_KEY, "1"); } catch (er) {}
-          DUEL._redirectGoogle(provider, user, cb);
-          return;
-        }
-        DUEL._adoptExistingCredential(e, cb);
-      });
-  }, (e) => cb(e));
-};
-
-/* à appeler une fois le SDK chargé (voir duelOpenLobby et boot()) pour
-   récupérer le résultat d'une éventuelle redirection Google laissée
-   en attente. */
-DUEL.checkGoogleRedirect = function (cb) {
-  /* appelé au boot dès qu'une redirection est en attente (voir boot()) :
-     l'appelant compte sur cb() pour savoir quand continuer — s'il n'est
-     jamais rappelé, l'écran-titre ne s'affiche jamais et l'appareil
-     reste bloqué sur une page blanche après le retour de Google. Donc
-     TOUJOURS rappeler cb, y compris quand il n'y a rien à signaler. */
-  if (!DUEL.ready() || typeof firebase === "undefined") { cb(null, null); return; }
-  DUEL.initFirebase();
-  firebase.auth().getRedirectResult()
-    .then((result) => {
-      try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (e) {}
-      /* .credential n'est pas fiable sur tous les navigateurs/versions
-         du SDK pour repérer un retour réussi — un .user suffit : c'est
-         justement lui qu'on veut (uid + email/nom Google). */
-      if (result && result.user) { DUEL.uid = result.user.uid; cb(null, { email: result.user.email, name: result.user.displayName }); return; }
-      cb(null, null);
-    })
-    .catch((e) => {
-      try { localStorage.removeItem(DUEL.REDIRECT_PENDING_KEY); } catch (er) {}
-      DUEL._adoptExistingCredential(e, cb);
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_WEB_CLIENT_ID,
+      scope: "openid email profile",
+      callback: (resp) => {
+        if (!resp || resp.error || !resp.access_token) { cb({ code: "auth/popup-closed-by-user" }); return; }
+        const credential = firebase.auth.GoogleAuthProvider.credential(null, resp.access_token);
+        firebase.auth().currentUser.linkWithCredential(credential)
+          .then((result) => cb(null, { email: result.user.email, name: result.user.displayName }))
+          .catch((e) => DUEL._adoptExistingCredential(e, cb));
+      },
+      error_callback: (err) => {
+        const t = err && err.type;
+        if (t === "popup_closed" || t === "user_logout_or_cancel") { cb({ code: "auth/popup-closed-by-user" }); return; }
+        if (t === "popup_failed_to_open") { cb({ code: "auth/popup-blocked" }); return; }
+        cb({ code: "auth/internal-error", message: (err && err.message) || t });
+      },
     });
+    client.requestAccessToken();
+  }, (e) => cb(e));
 };
 
 DUEL.seatPayload = function (uid, p) {
