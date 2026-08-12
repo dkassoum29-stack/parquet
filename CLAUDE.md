@@ -104,27 +104,12 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
 - `parquet_duels` (salons de match), `parquet_queue` (matchmaking),
   `parquet_leaderboard` (classement général — cote simple +15/-10/+2,
   pas un vrai ELO ; contient aussi position/ovr/badges/theme/emblem/title
-  pour que le profil d'un joueur soit consultable par les autres) :
-  règles déjà publiées par l'utilisateur.
-- `parquet_names` (registre pseudo→uid pour l'unicité des noms),
+  pour que le profil d'un joueur soit consultable par les autres),
+  `parquet_names` (registre pseudo→uid pour l'unicité des noms),
   `parquet_friends` (liste d'amis par uid), `parquet_challenges` (défi
   direct entre amis), `parquet_careers` (sauvegarde cloud de la
-  carrière solo par uid, voir section Compte Google) : **règles PAS
-  encore publiées** — le code se dégrade proprement en attendant
-  (pseudo non bloqué, ami non ajoutable avec message d'erreur clair,
-  sync cloud silencieusement inactive), mais il faut ajouter dans la
-  console Firebase (Realtime Database → Règles) :
-  ```json
-  "parquet_names": { ".read": "auth != null", ".write": "auth != null" },
-  "parquet_friends": { ".read": "auth != null", ".write": "auth != null" },
-  "parquet_challenges": { ".read": "auth != null", ".write": "auth != null" },
-  "parquet_careers": {
-    "$uid": {
-      ".read": "auth != null && auth.uid === $uid",
-      ".write": "auth != null && auth.uid === $uid"
-    }
-  }
-  ```
+  carrière solo par uid, voir section Compte Google) : **règles toutes
+  publiées** par l'utilisateur (2026-08-12).
 
 ## Workflow attendu
 
@@ -143,9 +128,6 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   (Pollinations.ai) n'a plus de niveau gratuit fonctionnel. Alternatives
   à explorer si demandé : recharger Pollinations, Google AI Studio
   (clé gratuite), ou Stable Diffusion en local.
-- Règles Firebase pour `parquet_names`/`parquet_friends`/`parquet_challenges`
-  à publier par l'utilisateur (voir section Firebase ci-dessus) — sans
-  ça, pseudo unique et système d'amis restent en dégradé.
 - Compte Google, y compris pour la carrière solo : code en place.
   `DUEL.linkGoogle`/`DUEL.googleLinkedInfo`/`DUEL.checkGoogleRedirect`
   (`duel.js`) relient le compte Google à l'uid anonyme existant
@@ -176,11 +158,12 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   étape (connexion en cours, erreur, succès) affiche un message clair
   et rassurant (`infoDialog` dans `app.js`) — plus jamais un clic qui
   ne semble rien faire.
-  Toujours pas fonctionnel : il faut que l'utilisateur active le
+  Règles `parquet_careers` publiées (2026-08-12, voir section Firebase
+  ci-dessus). Reste à confirmer : l'utilisateur doit activer le
   fournisseur Google dans la console Firebase (Authentication →
-  Sign-in method → Google) **et** publie les règles `parquet_careers`
-  (voir section Firebase ci-dessus). Sans ça, le bouton échoue
-  proprement avec un message clair (`auth/operation-not-allowed`).
+  Sign-in method → Google, en gardant Anonyme activé à côté — c'est le
+  socle du multijoueur). Sans ça, le bouton échoue proprement avec un
+  message clair (`auth/operation-not-allowed`).
   Non testable de bout en bout depuis l'agent (nécessite un vrai
   compte Google dans un vrai navigateur, et deux appareils pour
   vérifier la sync/les conflits) — le popup Google est aussi bloqué

@@ -2382,10 +2382,11 @@ function doLinkGoogle(onDone) {
         if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
         infoDialog("Compte Google", "Connexion impossible",
           (err.code === "auth/operation-not-allowed" ? "Le fournisseur Google n'est pas encore activé sur ce site."
+            : err.code === "auth/unauthorized-domain" ? "Ce site n'est pas encore autorisé pour la connexion Google (domaine à ajouter côté Firebase)."
             : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
             : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
             : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
-            : "La connexion a échoué, réessaie plus tard.")
+            : "La connexion a échoué" + (err.code ? " (" + err.code + ")" : "") + ", réessaie plus tard.")
           + " Rien n'est perdu : ta progression reste sur cet appareil.");
         return;
       }
