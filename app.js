@@ -2829,16 +2829,19 @@ function worldDrawCreateCharacter() {
 /* ─── carte joueur façon REP NBA 2K : rang coloré + barre de progression + badge de victoires à palier ─── */
 function duelBuildHeroCard(name, bioLine, ovr, profile, big, isMine) {
   const hero = el("div", "duel-hero-card" + (big ? " duel-hero-card-lg" : ""));
-  hero.style.borderColor = DUEL.themeColorFor(profile.theme || "default");
+  hero.style.setProperty("--hero-accent", DUEL.themeColorFor(profile.theme || "default"));
   const heroTop = el("div", "duel-hero-top");
   const heroId = el("div");
+  const nameRow = el("div", "duel-hero-name-row");
   const emblem = DUEL.emblemIconFor(profile.emblem || "default");
-  heroId.appendChild(el("div", "duel-hero-name", (emblem ? emblem + " " : "") + name));
+  if (emblem) nameRow.appendChild(el("span", "duel-hero-emblem", emblem));
+  nameRow.appendChild(el("span", "duel-hero-name", name));
+  heroId.appendChild(nameRow);
   const title = DUEL.titleTextFor(profile.title || "default");
   if (title) heroId.appendChild(el("div", "duel-hero-title", "« " + title + " »"));
   heroId.appendChild(el("div", "duel-hero-pos", bioLine));
   heroTop.appendChild(heroId);
-  const heroOvr = el("div");
+  const heroOvr = el("div", "duel-hero-ovr-wrap");
   heroOvr.appendChild(el("div", "duel-hero-ovr", ovr != null ? String(ovr) : "—"));
   heroOvr.appendChild(el("div", "duel-hero-ovr-label", "OVR"));
   if (isMine) heroOvr.appendChild(el("div", "duel-hero-tokens", "🪙 " + DUEL.getTokens()));
@@ -2869,6 +2872,7 @@ function duelBuildHeroCard(name, bioLine, ovr, profile, big, isMine) {
   const rankFill = el("div", "duel-rank-bar-fill");
   rankFill.style.width = Math.round(info.progress * 100) + "%";
   rankFill.style.background = info.color;
+  rankFill.style.boxShadow = "0 0 8px -1px " + info.color;
   rankBar.appendChild(rankFill);
   hero.appendChild(rankBar);
   hero.appendChild(el("div", "duel-rank-next", info.next ? "Prochain rang : " + info.next : "Rang maximum atteint"));
@@ -2890,7 +2894,7 @@ function duelBuildHeroCard(name, bioLine, ovr, profile, big, isMine) {
     chip.appendChild(document.createTextNode(bd));
     heroTrophies.appendChild(chip);
   });
-  if (!winTier && !otherBadges.length) heroTrophies.appendChild(el("span", "duel-badge", "Aucun badge pour l'instant"));
+  if (!winTier && !otherBadges.length) heroTrophies.appendChild(el("span", "duel-badge empty", "Aucun badge pour l'instant"));
   hero.appendChild(heroTrophies);
 
   return hero;

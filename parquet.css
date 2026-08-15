@@ -1647,28 +1647,43 @@ button { font: inherit; color: inherit; }
 .duel-challenge-banner { border-color: var(--accent); }
 
 .duel-hero-card {
-  background: var(--surface);
-  border: 1px solid var(--gain);
+  --hero-accent: var(--gain);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(130% 150% at 100% -10%, color-mix(in srgb, var(--hero-accent) 18%, transparent), transparent 62%),
+    var(--surface);
+  border: 1px solid color-mix(in srgb, var(--hero-accent) 45%, var(--line-soft));
   border-radius: var(--r-lg);
-  padding: 18px;
+  padding: 20px;
   margin-bottom: 18px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 12px 26px -20px rgba(0,0,0,.55);
 }
-.duel-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.duel-hero-name { font-family: var(--f-display); font-size: 22px; line-height: 1.15; }
-.duel-hero-pos { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
-.duel-hero-title { font-size: 12px; font-style: italic; color: var(--gold); margin-top: 3px; }
-.duel-hero-ovr { font-family: var(--f-mono); font-size: 28px; font-weight: 700; line-height: 1; color: var(--leather); text-align: right; }
-.duel-hero-ovr-label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); text-align: right; margin-top: 3px; }
-.duel-hero-tokens { font-family: var(--f-mono); font-size: 12px; color: var(--gold); text-align: right; margin-top: 6px; }
+.duel-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.duel-hero-name-row { display: flex; align-items: center; gap: 8px; }
+.duel-hero-emblem {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  background: color-mix(in srgb, var(--hero-accent) 22%, var(--bg-sunk));
+  font-size: 15px;
+}
+.duel-hero-name { font-family: var(--f-display); font-size: 22px; line-height: 1.15; letter-spacing: .01em; }
+.duel-hero-pos { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
+.duel-hero-title { font-size: 12px; font-style: italic; color: var(--gold); margin-top: 4px; }
+.duel-hero-ovr-wrap { text-align: right; }
+.duel-hero-ovr { font-family: var(--f-mono); font-size: 27px; font-weight: 800; line-height: 1; color: var(--hero-accent); }
+.duel-hero-ovr-label { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); text-align: right; margin-top: 4px; }
+.duel-hero-tokens { font-family: var(--f-mono); font-size: 12px; color: var(--gold); text-align: right; margin-top: 8px; }
 .duel-hero-stats {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px;
-  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 26px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft);
 }
-.duel-hero-stat-label { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 3px; }
-.duel-hero-stat-value { font-family: var(--f-mono); font-size: 15px; font-weight: 700; color: var(--gain); font-variant-numeric: tabular-nums; }
-.duel-rank-bar { height: 6px; border-radius: 3px; background: var(--bg-sunk); overflow: hidden; margin-top: 12px; border: 1px solid var(--line-soft); }
-.duel-rank-bar-fill { display: block; height: 100%; border-radius: 3px; transition: width .4s ease; }
-.duel-rank-next { font-size: 11px; color: var(--text-3); margin-top: 5px; }
+.duel-hero-stat { flex: 0 0 auto; min-width: 56px; text-align: center; }
+.duel-hero-stat-label { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+.duel-hero-stat-value { font-family: var(--f-mono); font-size: 16px; font-weight: 700; color: var(--gain); font-variant-numeric: tabular-nums; }
+.duel-rank-bar { height: 7px; border-radius: 4px; background: var(--bg-sunk); overflow: hidden; margin-top: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.duel-rank-bar-fill { display: block; height: 100%; border-radius: 4px; transition: width .4s ease; }
+.duel-rank-next { font-size: 11px; color: var(--text-3); margin-top: 6px; }
 .duel-hero-trophies {
   display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px;
   padding-top: 14px; border-top: 1px solid var(--line-soft);
@@ -1681,8 +1696,10 @@ button { font: inherit; color: inherit; }
 }
 .duel-badge .ic { font-size: 13px; }
 .duel-badge.tier { font-family: var(--f-mono); font-weight: 700; }
-.duel-hero-card-lg { padding: 22px; }
+.duel-badge.empty { color: var(--text-3); border-style: dashed; background: transparent; font-weight: 500; }
+.duel-hero-card-lg { padding: 24px; }
 .duel-hero-card-lg .duel-hero-name { font-size: 27px; }
+.duel-hero-card-lg .duel-hero-emblem { width: 34px; height: 34px; font-size: 18px; }
 .duel-hero-card-lg .duel-hero-ovr { font-size: 34px; }
 .duel-hero-card-lg .duel-hero-stat-value { font-size: 18px; }
 
