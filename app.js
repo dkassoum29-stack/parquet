@@ -3075,7 +3075,7 @@ function worldDrawHome() {
       challengeBtn.onclick = () => {
         const av = DUEL.getCharacter();
         challengeBtn.disabled = true; msg.textContent = "Création du salon…";
-        DUEL.challengeFriend(f.uid, av, (code, err) => {
+        DUEL.challengeFriend(f.key, av, (code, err) => {
           challengeBtn.disabled = false;
           if (!code) { msg.textContent = err || "Échec de la création."; return; }
           DUEL_UI.mode = "online";
@@ -3086,7 +3086,7 @@ function worldDrawHome() {
       btnGroup.appendChild(challengeBtn);
       const removeBtn = el("button", "btn-icon", "✕");
       removeBtn.setAttribute("aria-label", "Retirer " + f.name);
-      removeBtn.onclick = () => DUEL.removeFriend(f.uid);
+      removeBtn.onclick = () => DUEL.removeFriend(f.key);
       btnGroup.appendChild(removeBtn);
       row.appendChild(btnGroup);
       friendsList.appendChild(row);
@@ -3332,7 +3332,7 @@ function duelDrawWaiting() {
       row.appendChild(el("span", "duel-seat-state", seat ? (seat.ready ? "Prêt" : "…") : ""));
       if (seat && seat.uid && s !== DUEL_UI.mySeat) {
         row.classList.add("pan-row-click");
-        row.onclick = () => DUEL.getProfileByUid(seat.uid, seat.name, (p) => duelOpenProfile(p, { attrs: seat.attrs }, () => { show("screen-duel-lobby"); duelDrawWaiting(); }));
+        row.onclick = () => DUEL.getProfileByKey(seat.playerKey || seat.uid, seat.name, (p) => duelOpenProfile(p, { attrs: seat.attrs }, () => { show("screen-duel-lobby"); duelDrawWaiting(); }));
       }
       seatsBox.appendChild(row);
     });

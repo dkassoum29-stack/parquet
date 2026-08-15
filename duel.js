@@ -843,6 +843,19 @@ DUEL.ensureAuth = function (cb, onError) {
   });
 };
 
+/* Identité "carrière multijoueur". Jusqu'ici classement, pseudo, amis
+   et défis étaient tous rangés sous le seul uid Firebase — donc
+   partagés par tous les profils locaux du même appareil/compte : un
+   tout nouveau personnage multijoueur héritait des victoires/défaites
+   d'un profil complètement différent (constaté en usage réel le
+   2026-08-15). Clé composite uid+profil : chaque profil a maintenant
+   sa propre carrière multijoueur, même sous le même compte Google. */
+DUEL.playerKey = function (uid) {
+  const u = uid || DUEL.uid;
+  const pid = (typeof PROFILE !== "undefined" && PROFILE.activeId) ? PROFILE.activeId() : null;
+  return pid ? u + "__" + pid : u;
+};
+
 /* ═══════════════ Compte Google ═══════════════
    Le joueur reste d'abord authentifié anonymement (ensureAuth) : se
    connecter avec Google ne crée pas un nouveau compte, ça relie
@@ -975,7 +988,7 @@ DUEL.linkGoogle = function (cb) {
 
 DUEL.seatPayload = function (uid, p) {
   return {
-    uid, name: ENG.name(p), ovr: ENG.ovr(p), attrs: p.attrs,
+    uid, playerKey: DUEL.playerKey(uid), name: ENG.name(p), ovr: ENG.ovr(p), attrs: p.attrs,
     ready: false, connected: true, lastSeen: firebase.database.ServerValue.TIMESTAMP,
   };
 };
@@ -1327,7 +1340,7 @@ DUEL.setEquipped = function (type, id) {
    prochain DUEL.recordResult les republiera de toute façon. */
 DUEL.syncCosmetics = function () {
   if (!DUEL.ready() || !DUEL.uid) return;
-  DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.uid}`).update({
+  DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.playerKey()}`).update({
     theme: DUEL.getEquipped("theme"),
     emblem: DUEL.getEquipped("emblem"),
     title: DUEL.getEquipped("title"),
@@ -1533,9 +1546,10 @@ DUEL.reserveName = function (name, cb) {
   DUEL.ensureAuth((uid) => {
     const key = DUEL.normalizeName(name);
     if (!key) { cb(false, "Entre un nom d'abord."); return; }
+    const pk = DUEL.playerKey(uid);
     const prevKey = DUEL.normalizeName(DUEL.getAlias());
     DUEL.db.ref(`${DUEL.NAMES_ROOT}/${key}`).transaction(
-      (cur) => (cur === null || cur.uid === uid) ? { uid, name } : undefined,
+      (cur) => (cur === null || cur.playerKey === pk) ? { uid, playerKey: pk, name } : undefined,
       (error, committed) => {
         /* Si le nœud parquet_names n'a pas encore de règles publiées
            (permission_denied), on n'empêche pas la création du perso —
@@ -1545,7 +1559,7 @@ DUEL.reserveName = function (name, cb) {
         if (!committed) { cb(false, "Ce nom est déjà pris, choisis-en un autre."); return; }
         if (prevKey && prevKey !== key) {
           DUEL.db.ref(`${DUEL.NAMES_ROOT}/${prevKey}`).transaction(
-            (cur) => (cur && cur.uid === uid) ? null : cur
+            (cur) => (cur && cur.playerKey === pk) ? null : cur
           );
         }
         cb(true);
@@ -1569,30 +1583,32 @@ DUEL.addFriend = function (name, cb) {
   DUEL.ensureAuth((uid) => {
     const key = DUEL.normalizeName(name);
     if (!key) { cb(false, "Entre un pseudo d'abord."); return; }
+    const myKey = DUEL.playerKey(uid);
     DUEL.db.ref(`${DUEL.NAMES_ROOT}/${key}`).get().then((snap) => {
       const v = snap.val();
       if (!v) { cb(false, "Aucun joueur avec ce pseudo."); return; }
-      if (v.uid === uid) { cb(false, "C'est ton propre pseudo."); return; }
-      DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${uid}/${v.uid}`).set({
+      const friendKey = v.playerKey || v.uid;
+      if (friendKey === myKey) { cb(false, "C'est ton propre pseudo."); return; }
+      DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${myKey}/${friendKey}`).set({
         name: v.name, addedAt: firebase.database.ServerValue.TIMESTAMP,
       }).then(() => cb(true)).catch(() => cb(false, "Erreur réseau, réessaie."));
     }).catch(() => cb(false, "Erreur réseau, réessaie."));
   });
 };
 
-DUEL.removeFriend = function (friendUid) {
+DUEL.removeFriend = function (friendKey) {
   DUEL.ensureAuth((uid) => {
-    DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${uid}/${friendUid}`).remove();
+    DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${DUEL.playerKey(uid)}/${friendKey}`).remove();
   });
 };
 
 DUEL.listenFriends = function (cb) {
   DUEL.ensureAuth((uid) => {
     if (DUEL._friendsRef) DUEL._friendsRef.off();
-    DUEL._friendsRef = DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${uid}`);
+    DUEL._friendsRef = DUEL.db.ref(`${DUEL.FRIENDS_ROOT}/${DUEL.playerKey(uid)}`);
     DUEL._friendsRef.on("value", (snap) => {
       const v = snap.val() || {};
-      cb(Object.keys(v).map((fUid) => ({ uid: fUid, name: v[fUid].name })));
+      cb(Object.keys(v).map((fKey) => ({ key: fKey, name: v[fKey].name })));
     });
   });
 };
@@ -1601,12 +1617,12 @@ DUEL.stopListenFriends = function () {
   if (DUEL._friendsRef) { DUEL._friendsRef.off(); DUEL._friendsRef = null; }
 };
 
-DUEL.challengeFriend = function (friendUid, avatar, cb) {
+DUEL.challengeFriend = function (friendKey, avatar, cb) {
   DUEL.ensureAuth((uid) => {
     DUEL.createRoom(avatar, (code, err) => {
       if (!code) { cb(null, err); return; }
-      DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${friendUid}`).set({
-        fromUid: uid, fromName: DUEL.getAlias() || ENG.name(avatar), code,
+      DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${friendKey}`).set({
+        fromKey: DUEL.playerKey(uid), fromName: DUEL.getAlias() || ENG.name(avatar), code,
         at: firebase.database.ServerValue.TIMESTAMP,
       });
       cb(code, null);
@@ -1617,7 +1633,7 @@ DUEL.challengeFriend = function (friendUid, avatar, cb) {
 DUEL.listenChallenges = function (cb) {
   DUEL.ensureAuth((uid) => {
     if (DUEL._challengeRef) DUEL._challengeRef.off();
-    DUEL._challengeRef = DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${uid}`);
+    DUEL._challengeRef = DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${DUEL.playerKey(uid)}`);
     DUEL._challengeRef.on("value", (snap) => { const v = snap.val(); if (v) cb(v); });
   });
 };
@@ -1627,7 +1643,7 @@ DUEL.stopListenChallenges = function () {
 };
 
 DUEL.clearChallenge = function () {
-  DUEL.ensureAuth((uid) => { DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${uid}`).remove(); });
+  DUEL.ensureAuth((uid) => { DUEL.db.ref(`${DUEL.CHALLENGES_ROOT}/${DUEL.playerKey(uid)}`).remove(); });
 };
 
 /* ═══════════════ badges (multijoueur uniquement, cosmétique) ═══════════════ */
@@ -1644,7 +1660,7 @@ DUEL.awardBadge = function (character, id, label) {
    JAMAIS passer par ici : voir DUEL.recordSeasonResult plus bas. */
 DUEL.recordResult = function (won, tie) {
   DUEL.ensureAuth((uid) => {
-    const ref = DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${uid}`);
+    const ref = DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.playerKey(uid)}`);
     const c = DUEL.getCharacter();
     ref.get().then((snap) => {
       const cur = snap.val() || { name: DUEL.getAlias() || "Joueur", rating: 100, wins: 0, draws: 0, losses: 0 };
@@ -1692,7 +1708,7 @@ DUEL.recordSeasonResult = function (won) {
 
 DUEL.getMyRating = function (cb) {
   DUEL.ensureAuth((uid) => {
-    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${uid}`).get().then((snap) => {
+    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.playerKey(uid)}`).get().then((snap) => {
       const v = snap.val();
       cb(v ? (v.rating || 0) : 100);
     }).catch(() => cb(100));
@@ -1739,15 +1755,18 @@ DUEL.buildProfile = function (entry, character, fallbackName) {
 
 DUEL.getMyProfile = function (cb) {
   DUEL.ensureAuth((uid) => {
-    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${uid}`).get().then((snap) => {
+    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.playerKey(uid)}`).get().then((snap) => {
       cb(DUEL.buildProfile(snap.val(), DUEL.getCharacter(), DUEL.getAlias()));
     }).catch(() => cb(DUEL.buildProfile(null, DUEL.getCharacter(), DUEL.getAlias())));
   });
 };
 
-DUEL.getProfileByUid = function (uid, fallbackName, cb) {
+/* playerKey : la clé composite uid+profil d'un AUTRE joueur (reçue via
+   une place de salon ou une entrée d'amis), pas la mienne — donc pas
+   DUEL.playerKey() ici, on l'utilise telle quelle. */
+DUEL.getProfileByKey = function (playerKey, fallbackName, cb) {
   DUEL.ensureAuth(() => {
-    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${uid}`).get().then((snap) => {
+    DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${playerKey}`).get().then((snap) => {
       cb(DUEL.buildProfile(snap.val(), null, fallbackName));
     }).catch(() => cb(null));
   });
