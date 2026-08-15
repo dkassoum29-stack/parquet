@@ -1687,42 +1687,56 @@ DUEL.awardBadge = function (character, id, label) {
 
    tokenRates (optionnel) : {win, tie, loss} — permet à
    recordSeasonResult de créditer moins de jetons qu'un vrai match en
-   ligne sans dupliquer toute la logique de classement. */
+   ligne sans dupliquer toute la logique de classement.
+
+   Transaction Firebase plutôt qu'un get() puis un set() séparés : ces
+   deux étapes n'étaient pas atomiques, donc enchaîner plusieurs
+   matchs rapidement (typiquement en Saison, avec "Simuler" ou
+   plusieurs matchs de suite) pouvait faire lire à un match la cote
+   d'avant l'écriture du match précédent, puis écraser cette écriture
+   avec des chiffres partis de données déjà périmées — une victoire
+   entière disparaissait silencieusement du classement (constaté en
+   usage réel : les stats ne montaient plus après un match de Saison). */
 DUEL.recordResult = function (won, tie, cb, tokenRates) {
   const rates = tokenRates || { win: 20, tie: 5, loss: 5 };
   DUEL.ensureAuth((uid) => {
     const ref = DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.playerKey(uid)}`);
     const c = DUEL.getCharacter();
-    ref.get().then((snap) => {
-      const cur = snap.val() || { name: DUEL.getAlias() || "Joueur", rating: 100, wins: 0, draws: 0, losses: 0 };
+    let ratingBefore = 100;
+    ref.transaction((cur) => {
+      const base = cur || { name: DUEL.getAlias() || "Joueur", rating: 100, wins: 0, draws: 0, losses: 0 };
+      ratingBefore = base.rating || 100;
       const delta = tie ? 2 : (won ? 15 : -10);
-      const newWins = (cur.wins || 0) + (won ? 1 : 0);
-      const newRating = Math.max(0, (cur.rating || 100) + delta);
-      ref.set({
-        name: DUEL.getAlias() || cur.name || "Joueur",
-        rating: newRating,
-        wins: newWins,
-        draws: (cur.draws || 0) + (tie ? 1 : 0),
-        losses: (cur.losses || 0) + (!won && !tie ? 1 : 0),
-        position: c ? c.position : (cur.position || null),
-        ovr: c ? ENG.ovr(c) : (cur.ovr != null ? cur.ovr : null),
-        badges: c && c.badges ? c.badges.map((bd) => bd.label || bd) : (cur.badges || []),
+      return {
+        name: DUEL.getAlias() || base.name || "Joueur",
+        rating: Math.max(0, ratingBefore + delta),
+        wins: (base.wins || 0) + (won ? 1 : 0),
+        draws: (base.draws || 0) + (tie ? 1 : 0),
+        losses: (base.losses || 0) + (!won && !tie ? 1 : 0),
+        position: c ? c.position : (base.position || null),
+        ovr: c ? ENG.ovr(c) : (base.ovr != null ? base.ovr : null),
+        badges: c && c.badges ? c.badges.map((bd) => bd.label || bd) : (base.badges || []),
         theme: DUEL.getEquipped("theme"),
         emblem: DUEL.getEquipped("emblem"),
         title: DUEL.getEquipped("title"),
         updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      }).then(() => cb && cb()).catch(() => cb && cb());
+      };
+    }, (error, committed, snapshot) => {
+      cb && cb();
+      if (error || !committed) return;
+      const final = snapshot ? snapshot.val() : null;
+      if (!final) return;
       /* Toujours attribué (même palier bronze) : c'est ce badge, pas
          le palier affiché plus haut, qui débloque le coup signature
          via DUEL.signatureUsesForCharacter — voir plus bas. */
-      if (newWins >= 10) {
+      if (final.wins >= 10) {
         if (c && DUEL.awardBadge(c, "wins10", "10 victoires")) DUEL.setCharacter(c);
       }
       /* Jetons de boutique : un peu à chaque match, un bonus si le
          palier de rang change (façon Rep NBA 2K qui récompense la
          montée de niveau). */
       let earned = tie ? rates.tie : (won ? rates.win : rates.loss);
-      if (DUEL.rankInfo(cur.rating || 100).label !== DUEL.rankInfo(newRating).label) earned += 50;
+      if (DUEL.rankInfo(ratingBefore).label !== DUEL.rankInfo(final.rating).label) earned += 50;
       DUEL.addTokens(earned);
     });
   });
