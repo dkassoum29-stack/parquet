@@ -3014,7 +3014,7 @@ function worldDrawHome() {
   const profilHead = el("div", "profiles-head");
   profilHead.appendChild(el("div", "card-title", "Profil"));
   profilCard.appendChild(profilHead);
-  const profileBtn = el("button", "btn btn-quiet btn-block", "Voir mon profil complet");
+  const profileBtn = el("button", "btn btn-quiet btn-block", "Voir mes attributs");
   profileBtn.onclick = () => DUEL.getMyProfile((p) => duelOpenProfile(p, DUEL.getCharacter(), () => { show("screen-duel-lobby"); worldDrawHome(); }, true));
   profilCard.appendChild(profileBtn);
   const boardBtn = el("button", "btn btn-quiet btn-block", "Classement général");
@@ -3246,12 +3246,19 @@ function duelOpenProfile(profile, attrsSource, backFn, isMine) {
         const v = Math.round(attrs[a.id] || 0);
         const attrRow = el("div", "attr" + (isMine ? " attr-editable" : ""));
         attrRow.appendChild(el("span", "attr-n", a.label));
+        if (isMine) {
+          const minus = el("button", "btn-icon attr-minus", "−");
+          minus.disabled = v <= 0;
+          minus.title = "Reprendre un point";
+          minus.setAttribute("aria-label", "Reprendre un point en " + a.label);
+          minus.onclick = () => { if (DUEL.refundAttrPoint(attrsSource, a.id)) refresh(); };
+          attrRow.appendChild(minus);
+        }
         const bar = el("span", "attr-bar");
         const fill = el("i", tierClass(v));
         fill.style.width = v + "%";
         bar.appendChild(fill);
         attrRow.appendChild(bar);
-        attrRow.appendChild(el("span", "attr-v", v));
         if (isMine) {
           const atCap = v >= cap;
           const plus = el("button", "btn-icon attr-plus", "+");
@@ -3261,6 +3268,7 @@ function duelOpenProfile(profile, attrsSource, backFn, isMine) {
           plus.onclick = () => { if (DUEL.spendAttrPoint(attrsSource, a.id)) refresh(); };
           attrRow.appendChild(plus);
         }
+        attrRow.appendChild(el("span", "attr-v", v));
         sect.appendChild(attrRow);
       });
       attrsBody.appendChild(sect);

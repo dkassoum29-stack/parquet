@@ -1735,6 +1735,17 @@ DUEL.spendAttrPoint = function (c, attrId) {
   return true;
 };
 
+/* Retire un point d'un attribut pour le remettre dans la réserve —
+   permet de corriger une répartition sans perdre de points au total
+   (juste un aller-retour attribut ↔ réserve). */
+DUEL.refundAttrPoint = function (c, attrId) {
+  if (!c || !c.attrs || !((c.attrs[attrId] || 0) > 0)) return false;
+  c.attrs[attrId] -= 1;
+  c.attrPoints = (c.attrPoints || 0) + 1;
+  DUEL.setCharacter(c);
+  return true;
+};
+
 DUEL.recordResult = function (won, tie, cb, tokenRates) {
   const rates = tokenRates || { win: 20, tie: 5, loss: 5 };
   DUEL.ensureAuth((uid) => {
