@@ -243,8 +243,28 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   natif Firebase), ce champ n'est pas toujours réattaché — corrigé en
   réutilisant directement le credential déjà construit dans
   `DUEL.linkGoogle` (passé en paramètre à `_adoptExistingCredential`
-  plutôt que relu depuis l'erreur). Pas encore reconfirmé en usage réel
-  par l'utilisateur après ce correctif.
+  plutôt que relu depuis l'erreur). N'a pas suffi à lui seul (voir bug
+  racine ci-dessous).
+
+  **Bug racine trouvé le 2026-08-15** : `DUEL.ensureAuth` appelait
+  `firebase.auth().signInAnonymously()` immédiatement, sans attendre le
+  tout premier événement `onAuthStateChanged` (celui qui signale que
+  Firebase a fini de relire la session persistée en IndexedDB). Résultat :
+  à chaque rechargement de page, avant même que la session Google déjà
+  reliée ait pu être restaurée, une toute nouvelle session anonyme
+  écrasait silencieusement la session persistée — obligeant à se
+  reconnecter à chaque fois (la connexion tenait tant que l'onglet
+  restait ouvert, mais sautait au moindre redémarrage) et, plus grave,
+  cassant `PROFILE.reconcileWithCloud`/`DUEL.reconcileMpWithCloud`
+  puisque chaque session repartait sur un uid différent au lieu de
+  converger vers le même compte — probablement la vraie cause du
+  `credential-already-in-use` récurrent lui aussi (chaque « reconnexion »
+  partait d'un uid neuf en conflit avec l'ancien). Corrigé en attendant
+  ce premier événement avant de décider de créer un compte anonyme.
+  Testé fonctionnellement en simulant le délai de restauration Firebase
+  (session persistée → 0 appel à `signInAnonymously`, aucune session →
+  1 appel, comportement normal) ; pas encore reconfirmé en usage réel
+  par l'utilisateur.
 
   Non testable de bout en bout depuis l'agent (nécessite un vrai
   compte Google dans un vrai navigateur) — le popup Google est bloqué

@@ -817,12 +817,30 @@ DUEL.initFirebase = function () {
    appelants (salons, classement…) n'ont rien de mieux à faire que
    réessayer plus tard donc l'ignorent — mais DUEL.linkGoogle en a
    besoin pour ne pas laisser le joueur devant une fenêtre « Connexion
-   en cours… » qui ne se refermera jamais. */
+   en cours… » qui ne se refermera jamais.
+
+   Au chargement de la page, Firebase met un instant à relire la
+   session persistée (IndexedDB) — tant que ce premier événement n'est
+   pas arrivé, `signInAnonymously()` ne sait pas encore qu'une session
+   Google déjà reliée existe. Appeler `signInAnonymously()` tout de
+   suite, sans attendre ce premier événement, créait donc une toute
+   nouvelle session anonyme à chaque rechargement et écrasait la
+   session Google déjà reliée — obligeant à se reconnecter à chaque
+   fois alors que le lien avait pourtant été fait (constaté en usage
+   réel le 2026-08-15 : la connexion tient tant que l'onglet reste
+   ouvert, mais saute au moindre redémarrage). On attend maintenant ce
+   premier événement ; si (et seulement si) il n'y a vraiment aucune
+   session à restaurer, on crée l'anonyme. */
 DUEL.ensureAuth = function (cb, onError) {
   DUEL.initFirebase();
   if (DUEL.uid) { cb(DUEL.uid); return; }
-  firebase.auth().onAuthStateChanged((u) => { if (u) { DUEL.uid = u.uid; cb(u.uid); } });
-  firebase.auth().signInAnonymously().catch((e) => { console.error("Auth duel :", e); onError && onError(e); });
+  let resolved = false;
+  firebase.auth().onAuthStateChanged((u) => {
+    if (u) { DUEL.uid = u.uid; cb(u.uid); return; }
+    if (resolved) return;
+    resolved = true;
+    firebase.auth().signInAnonymously().catch((e) => { console.error("Auth duel :", e); onError && onError(e); });
+  });
 };
 
 /* ═══════════════ Compte Google ═══════════════
