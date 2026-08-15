@@ -85,11 +85,52 @@ via la boutique).
 
 **Important** : `ENG.simSeason` (carrière solo) n'est JAMAIS touché par
 le multijoueur — c'est une couche additive à part, pour préserver le
-calibrage déjà en place (taux de MVP, draft, etc.). De la même façon,
-**`DUEL.recordResult` (classement public, rang, badges à palier) est
-réservé aux vrais matchs Ami/Aléatoire** — les matchs de Saison passent
-par `DUEL.recordSeasonResult` (jetons seulement) pour ne jamais polluer
-le classement PvP avec des résultats IA.
+calibrage déjà en place (taux de MVP, draft, etc.).
+
+**`DUEL.recordResult`** (classement public, rang, badges à palier,
+points d'attribut — voir plus bas) alimente le **même** classement pour
+Ami/Aléatoire **et** Saison contre l'IA — décision explicite de
+l'utilisateur (2026-08-15), après l'avoir prévenu que ça mélange
+résultats contre IA et contre de vrais joueurs dans la même cote.
+`DUEL.recordSeasonResult(won, tie, cb)` n'est qu'un relais vers
+`recordResult` avec un `tokenRates` plus modeste (8V/4N/2D contre
+20V/5N/5D en ligne), pour que grinder l'IA en Saison ne rapporte pas
+autant que de vrais matchs.
+
+### Identité multijoueur (`DUEL.playerKey`)
+
+Classement, pseudo, amis et défis sont identifiés par une clé
+composite **`uid__idProfil`** (`DUEL.playerKey(uid)`), pas par le seul
+uid Firebase — chaque **profil local** (compte de la section Comptes
+ci-dessous) a ainsi sa propre carrière multijoueur, même connecté au
+même compte Google/même appareil. Avant ce changement (2026-08-15),
+tous les profils locaux d'un même appareil partageaient un seul
+classement : un tout nouveau personnage héritait des victoires d'un
+profil complètement différent. Touche `parquet_leaderboard`,
+`parquet_names`, `parquet_friends`, `parquet_challenges`, et la place
+de salon (`DUEL.seatPayload`, champ `playerKey` en plus de `uid`, pour
+retrouver le profil d'un adversaire en cours de match). Les salons/
+matchmaking (`parquet_duels`, `parquet_queue`) restent en simple `uid`
+— état éphémère, pas une carrière, un seul profil actif à la fois.
+Voir section Firebase plus bas pour la règle de sécurité correspondante
+(`$key === auth.uid || $key.beginsWith(auth.uid + '__')`).
+
+### Progression d'attributs (2026-08-15)
+
+Quelques points d'attribut crédités après chaque match compté
+(`DUEL.MP_GROWTH = {win:3, tie:1, loss:0}`), mis de côté dans une
+réserve (`c.attrPoints`) plutôt qu'appliqués automatiquement — le
+joueur les répartit lui-même sur l'écran « profil complet » (carte
+Attributs interactive, un bouton **+** par attribut, uniquement
+visible sur son propre personnage). Plafonné par `c.potential` (même
+champ que la carrière solo, déjà fixé à la création via
+`ENG.newPlayer`/`DUEL.quickAvatar`, simplement jamais exploité avant
+ça en multijoueur) — `DUEL.spendAttrPoint(c, attrId)` fait la dépense
+et la sauvegarde. Pèse vraiment sur l'issue des matchs :
+`DUEL.resolveChoice` déplace la probabilité de réussite d'environ 0.8
+point par point d'attribut. Complètement séparé de `ENG.progress`
+(carrière solo, cycle annuel avec déclin lié à l'âge) — jamais touché
+depuis le multijoueur.
 
 ### Rang, badges, boutique (façon NBA 2K MyCareer)
 
@@ -101,10 +142,25 @@ le classement PvP avec des résultats IA.
   direct, pas stocké) : Bronze (10V) → Argent (50V) → Or (150V) → Hall
   of Fame (300V), en plus des badges événementiels classiques
   (Sans-faute, Champion de conférence…).
-- **Boutique** (onglet dédié, `duelRenderShop`) : jetons gagnés en
-  jouant en ligne (+20V/+5N-D, +50 bonus à chaque changement de rang),
-  dépensables sur ~47 objets cosmétiques en 4 familles — thèmes de
-  couleur pour la carte, emblèmes, titres, taunts. Thème/emblème/titre
+- **Boutique** (onglet dédié, `duelRenderShop`, `DUEL_SHOP_CATEGORIES`) :
+  jetons gagnés en jouant (+20V/+5N-D en ligne, +8V/+4N/+2D en Saison,
+  +50 bonus à chaque changement de rang), dépensables sur des objets
+  cosmétiques. **Réduite aux thèmes de carte + emblèmes depuis
+  2026-08-15** (titres et taunts retirés de l'affichage à la demande —
+  leurs objets restent dans `DUEL.SHOP_ITEMS`, juste absents de
+  `DUEL_SHOP_CATEGORIES`, faciles à remettre). Les 10 thèmes de carte
+  (Aube Corail, Chrome Platine, Émeraude Franchise, Sang Écarlate,
+  Ambre Prestige, Néon Rétro, Glacier Diamant, Onyx Élite, Améthyste
+  Royale, Opale Galactique — façon tirages 2K MyTEAM) ont chacun une
+  vraie finition dans `parquet.css` (classe `.hero-theme-*` : fond,
+  liseré, contraste de texte propres — pas juste une couleur d'accent)
+  appliquée par `duelBuildHeroCard` selon `profile.theme`. Un onzième
+  thème, **Cuir Signature** (le orange du site en version premium),
+  existe dans le code mais reste volontairement hors boutique — non
+  vendu, pas encore branché ailleurs non plus. Bouton **Aperçu** (👁)
+  sur chaque thème/emblème dans la boutique : ouvre la vraie carte
+  avec l'objet appliqué, en fenêtre légère par-dessus l'écran actuel
+  (pas de navigation), sans rien acheter ni équiper. Thème/emblème/titre
   équipés sont synchronisés sur `parquet_leaderboard` (`DUEL.syncCosmetics`)
   pour être visibles par les autres joueurs, pas seulement en local.
 
@@ -302,11 +358,6 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   `GOOGLE_WEB_CLIENT_ID` en conditions réelles depuis l'agent (le
   fichier servi était confirmé correct via `curl` direct, seul le
   navigateur de test gardait une version périmée en cache).
-- Nouvelle finition de carte profil : 5 propositions visuelles dans un
-  artefact (Onyx Élite / Ambre Prestige / Améthyste Royale / Glacier
-  Diamant / Opale Galactique, façon tirages 2K MyTEAM), toujours pas
-  branchées sur `.duel-hero-card` — en attente du choix de l'utilisateur
-  (une seule par défaut, ou les 5 comme objets de boutique).
 - Classement de prod (`parquet_leaderboard`) pollué par plusieurs lignes
   de comptes de test créés pendant les sessions de dev (ex. "Ghost
   Preview", "Card Test") — à nettoyer à la main dans la console Firebase
