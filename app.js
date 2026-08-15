@@ -2347,7 +2347,7 @@ function b64dec(s) { return decodeURIComponent(escape(atob(s))); }
 let PF = { emblem: "🏀", name: "" };
 
 function renderProfileChip() {
-  const a = PROFILE.active();
+  const a = PROFILE.activeVisible();
   $("profile-emblem").textContent = a ? a.emblem : "🏀";
   $("profile-name").textContent = a ? a.name : "Créer un profil";
 }
@@ -2467,8 +2467,16 @@ function openAccountMenu(onDone) {
         DUEL.signOutGoogle(() => {
           PROFILE.forgetGoogleLinked();
           paintBrandCorner();
-          infoDialog("Compte Google", "Déconnecté", "Tu peux maintenant relier un autre compte Google. Ta progression locale n'a pas bougé.");
-          onDone && onDone();
+          /* les profils créés sous ce compte (privés, voir PROFILE.create)
+             ne doivent plus s'afficher une fois déconnecté — ils
+             reviendront dès qu'on se reconnecte, ici ou ailleurs. */
+          const hidden = !PROFILE.activeVisible();
+          if (hidden) S = null;
+          infoDialog("Compte Google", "Déconnecté",
+            hidden
+              ? "Les profils liés à ce compte ne sont plus affichés sur cet appareil. Ils reviendront dès que tu te reconnecteras (ici ou ailleurs)."
+              : "Tu peux maintenant relier un autre compte Google. Ta progression locale n'a pas bougé.");
+          if (hidden) showProfiles(); else onDone && onDone();
         });
       } });
   }
@@ -2533,7 +2541,7 @@ function showProfiles(flash) {
     b.appendChild(f);
   }
 
-  const list = PROFILE.list();
+  const list = PROFILE.visibleList();
   const activeId = PROFILE.activeId();
 
   if (list.length) {
@@ -2649,7 +2657,13 @@ function bootFinish() {
     DUEL.loadFirebaseSDK().then(() => {
       paintBrandCorner();
       reconcileAllWithCloud((result) => {
-        if (!result || result.error) return;
+        /* l'état de connexion n'est fiable qu'une fois cet appel
+           revenu (DUEL.ensureAuth, appelé dedans, a fini d'attendre la
+           vraie session restaurée) — vérifier avant, juste après le
+           chargement du SDK, serait trop tôt et cacherait à tort un
+           profil pourtant bien relié au bon compte. */
+        if (!PROFILE.activeVisible()) { S = null; showProfiles(); return; }
+        if (!result || result.error) { renderProfileChip(); return; }
         const onScreenBoot = !$("screen-boot").classList.contains("hidden");
         if (result.conflicts && result.conflicts.length) {
           resolveGoogleConflicts(result, () => {

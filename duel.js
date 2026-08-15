@@ -861,6 +861,17 @@ DUEL.googleLinkedInfo = function () {
   return g ? { email: g.email, name: g.displayName } : null;
 };
 
+/* uid du compte Google relié, ou null — sert à PROFILE pour savoir à
+   quel compte rattacher un profil créé pendant qu'on est connecté
+   (voir PROFILE.currentGoogleUid, profile.js). */
+DUEL.googleLinkedUid = function () {
+  if (!DUEL.ready() || typeof firebase === "undefined" || !firebase.apps || !firebase.apps.length) return null;
+  const u = firebase.auth().currentUser;
+  if (!u) return null;
+  const g = u.providerData.find((p) => p.providerId === "google.com");
+  return g ? u.uid : null;
+};
+
 /* Retire le lien Google de cet appareil (utile pour tester avec un
    autre compte, ou repartir à zéro) — ne touche jamais aux profils
    locaux ni à la progression, qui restent sur l'appareil comme avant

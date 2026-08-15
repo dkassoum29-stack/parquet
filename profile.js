@@ -37,6 +37,14 @@ PROFILE.key = function (base) {
   return "parquet_" + base + (id ? "__" + id : "");
 };
 
+/* uid du compte Google relié en ce moment, ou null si personne n'est
+   connecté — délégué à DUEL (duel.js) qui porte la vraie session
+   Firebase ; PROFILE ne fait qu'y lire pour savoir à qui rattacher un
+   profil. */
+PROFILE.currentGoogleUid = function () {
+  return (typeof DUEL !== "undefined" && DUEL.googleLinkedUid) ? DUEL.googleLinkedUid() : null;
+};
+
 PROFILE.create = function (name, emblem) {
   const l = PROFILE.list();
   const id = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -46,10 +54,37 @@ PROFILE.create = function (name, emblem) {
     emblem: emblem || "🏀",
     created: Date.now(),
   };
+  /* profil créé pendant qu'un compte Google est relié : privé à ce
+     compte (invisible aux autres utilisateurs de cet appareil, et à
+     ce compte seulement dès qu'il se déconnecte — voir visibleList).
+     Créé hors connexion, il reste visible par tout le monde sur cet
+     appareil, comme avant cette fonctionnalité. */
+  const owner = PROFILE.currentGoogleUid();
+  if (owner) prof.ownerUid = owner;
   l.push(prof);
   PROFILE.saveList(l);
   PROFILE.switchTo(id);
   return prof;
+};
+
+/* Liste filtrée pour l'affichage : cache les profils privés à un
+   autre compte Google que celui relié en ce moment (ou à aucun, si
+   personne n'est connecté). Ne jamais utiliser pour la logique interne
+   (synchro, suppression…) qui doit voir tous les profils réels de
+   l'appareil — seulement pour ce que l'écran des profils propose. */
+PROFILE.visibleList = function () {
+  const uid = PROFILE.currentGoogleUid();
+  return PROFILE.list().filter((p) => !p.ownerUid || p.ownerUid === uid);
+};
+
+/* Le profil actif, mais seulement s'il est visible avec la connexion
+   actuelle — sinon (compte propriétaire déconnecté) on le traite comme
+   s'il n'y avait pas de profil actif du tout, plutôt que de laisser le
+   joueur continuer sur un profil qui n'est plus censé lui être montré. */
+PROFILE.activeVisible = function () {
+  const a = PROFILE.active();
+  if (!a || !a.ownerUid) return a;
+  return a.ownerUid === PROFILE.currentGoogleUid() ? a : null;
 };
 
 PROFILE.switchTo = function (id) {
@@ -164,11 +199,16 @@ PROFILE.snapshot = function (id) {
   return { profile: prof, save, pantheon, meta, updatedAt: PROFILE.lastTouched(id) || Date.now() };
 };
 
-/* remplace l'état local d'un compte par un instantané reçu du cloud */
-PROFILE.applySnapshot = function (id, snap) {
+/* remplace l'état local d'un compte par un instantané reçu du cloud.
+   ownerUid : uniquement pour un profil qui n'existait pas du tout sur
+   cet appareil avant (littéralement « créé » par ce compte, ailleurs)
+   — un profil déjà présent ici et juste mis à jour par une résolution
+   de conflit ne devient pas rétroactivement privé. */
+PROFILE.applySnapshot = function (id, snap, ownerUid) {
   const list = PROFILE.list();
   const i = list.findIndex((p) => p.id === id);
   const prof = Object.assign({}, snap.profile || {}, { id });
+  if (ownerUid) prof.ownerUid = ownerUid;
   if (i >= 0) list[i] = prof; else list.push(prof);
   PROFILE.saveList(list);
   try {
@@ -224,7 +264,7 @@ PROFILE.reconcileWithCloud = function (cb) {
         Object.keys(cloud).forEach((id) => {
           const cSnap = cloud[id];
           const existsLocally = local.some((p) => p.id === id);
-          if (!existsLocally) { PROFILE.applySnapshot(id, cSnap); pulled.push(id); return; }
+          if (!existsLocally) { PROFILE.applySnapshot(id, cSnap, uid); pulled.push(id); return; }
           const localAt = PROFILE.lastTouched(id);
           const cloudAt = cSnap.updatedAt || 0;
           if (cloudAt > localAt + 2000) conflicts.push({ id, cloudAt, localAt, cSnap, kind: "career", name: cSnap.profile && cSnap.profile.name });
