@@ -46,6 +46,17 @@ séparé (comme MyCareer vs The City dans NBA 2K), pas greffé dans la
 carrière solo. Un **personnage multijoueur persistant** (`DUEL.getCharacter`/
 `setCharacter`, stocké en `localStorage`) sert pour les trois sous-modes :
 
+Connecté à un compte Google, ce personnage (jetons `DUEL.getTokens`,
+cosmétiques possédés `DUEL.getOwned`, thème/emblème/titre équipés) est
+lui aussi synchronisé entre appareils — même mécanique que la carrière
+solo ci-dessous (`DUEL.pushMpToCloud`/`DUEL.reconcileMpWithCloud`,
+`parquet_mp_characters/<uid>/<idCompte>`, comparaison par horodatage,
+conflit réel signalé via `resolveGoogleConflicts`). Jusqu'ici c'était
+purement local et donc perdu en changeant d'appareil ; `parquet_leaderboard`
+reste écrit en plus (upload à sens unique) pour que le classement/profil
+public reste visible de tous. `reconcileAllWithCloud` (`app.js`) fusionne
+cette synchro avec celle de la carrière solo en un seul écran de résultat.
+
 - **Saison** : choix de franchise, calendrier léger (2 matchs par
   adversaire de sa conférence, ~28 matchs), playoffs joués au meilleur
   des 3 (bracket top 8, les séries qui ne concernent pas le joueur se
@@ -157,9 +168,8 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   OAuth doit avoir le domaine du site (et `localhost` en dev) dans ses
   **Authorized JavaScript origins** côté Google Cloud Console
   (Identifiants → cliquer le client Web → ajouter l'origine), sans
-  quoi `requestAccessToken()` échoue — pas encore confirmé fait par
-  l'utilisateur, à vérifier si la connexion échoue encore après ce
-  changement.
+  quoi `requestAccessToken()` échoue — fait et confirmé fonctionnel le
+  2026-08-15 (voir plus bas).
 
   La fenêtre Google doit s'ouvrir dans le même tick que le clic du
   joueur pour ne pas être bloquée par Safari : `openAccountMenu`
@@ -192,6 +202,50 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   ci-dessus). Fournisseur Google activé côté Firebase (confirmé —
   l'erreur `auth/operation-not-allowed` avait disparu avant même ce
   changement de méthode).
+
+  **État au 2026-08-12 (testé en vrai sur iPhone Safari par
+  l'utilisateur)** : la fenêtre Google s'ouvre maintenant correctement
+  (avant elle ne s'ouvrait jamais, ni en popup ni en redirection — la
+  preuve que GIS contourne bien le blocage Safari) mais échoue avec
+  **`Erreur 400: origin_mismatch`** côté Google. Cause : l'origine du
+  site (`https://parquet-hoop-destiny.vercel.app`, sans slash final)
+  n'est pas (encore correctement) dans les **Authorized JavaScript
+  origins** du client OAuth `GOOGLE_WEB_CLIENT_ID` côté Google Cloud
+  Console (Identifiants → cliquer le client Web) — l'utilisateur a dit
+  l'avoir fait mais l'erreur persiste ; à re-vérifier avec lui : bon
+  champ (Authorized JavaScript origins, PAS Authorized redirect URIs),
+  format exact sans slash final, bouton Enregistrer bien cliqué, et
+  laisser quelques minutes de propagation côté Google après
+  l'enregistrement.
+
+  **Résolu le 2026-08-15** : connexion Google confirmée fonctionnelle
+  de bout en bout par l'utilisateur sur iPhone Safari. Un deuxième
+  client OAuth existait dans Google Cloud Console
+  (`480931260884-...`, probablement auto-créé par Firebase en activant
+  le fournisseur Google, absent du code) en plus de celui réellement
+  utilisé (`321612677309-02esjvfu7bek8jogp6kjp7eiqmrjo3e5...`,
+  `GOOGLE_WEB_CLIENT_ID` dans `firebase-config.js`) — source de
+  confusion possible si la mauvaise fiche avait été éditée jusqu'ici.
+  La correction a consisté à retrouver la bonne fiche
+  (`321612677309-...`) et à y ajouter `https://parquet-hoop-destiny.vercel.app`
+  dans les Authorized JavaScript origins (en plus de
+  `https://parquet-duel.firebaseapp.com` qui y était déjà et a été
+  remis). Aucun changement de code nécessaire, `GOOGLE_WEB_CLIENT_ID`
+  était déjà le bon.
+
+  **Bug trouvé juste après (2026-08-15)** : une fois l'origine
+  corrigée, un nouvel échec est apparu — `auth/credential-already-in-use`
+  affiché tel quel au lieu d'être rattrapé par `DUEL._adoptExistingCredential`
+  (censé basculer automatiquement sur le compte existant, voir plus
+  haut). Cause : `_adoptExistingCredential` s'appuyait sur
+  `e.credential` renvoyé par Firebase sur l'erreur, mais avec un
+  credential construit à la main depuis un jeton GIS (pas via le popup
+  natif Firebase), ce champ n'est pas toujours réattaché — corrigé en
+  réutilisant directement le credential déjà construit dans
+  `DUEL.linkGoogle` (passé en paramètre à `_adoptExistingCredential`
+  plutôt que relu depuis l'erreur). Pas encore reconfirmé en usage réel
+  par l'utilisateur après ce correctif.
+
   Non testable de bout en bout depuis l'agent (nécessite un vrai
   compte Google dans un vrai navigateur) — le popup Google est bloqué
   dans le navigateur sandboxé de l'agent (politique de l'organisation

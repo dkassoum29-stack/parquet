@@ -224,7 +224,7 @@ PROFILE.reconcileWithCloud = function (cb) {
           if (!existsLocally) { PROFILE.applySnapshot(id, cSnap); pulled.push(id); return; }
           const localAt = PROFILE.lastTouched(id);
           const cloudAt = cSnap.updatedAt || 0;
-          if (cloudAt > localAt + 2000) conflicts.push({ id, cloudAt, localAt, cSnap, name: cSnap.profile && cSnap.profile.name });
+          if (cloudAt > localAt + 2000) conflicts.push({ id, cloudAt, localAt, cSnap, kind: "career", name: cSnap.profile && cSnap.profile.name });
         });
 
         local.forEach((p) => { if (!cloud[p.id]) { PROFILE.pushToCloud(p.id, () => {}); pushed.push(p.id); } });

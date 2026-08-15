@@ -2384,6 +2384,23 @@ function googleFailDialog(label) {
   infoDialog("Compte Google", "Connexion impossible", label + " Rien n'est perdu : ta progression reste sur cet appareil.");
 }
 
+/* PROFILE.reconcileWithCloud (carrière solo) et DUEL.reconcileMpWithCloud
+   (personnage multijoueur, jetons, cosmétiques) sont deux synchros
+   indépendantes — mais un seul écran de résultat pour le joueur. */
+function reconcileAllWithCloud(cb) {
+  PROFILE.reconcileWithCloud((careerResult) => {
+    DUEL.reconcileMpWithCloud((mpResult) => {
+      if (careerResult && careerResult.error && mpResult && mpResult.error) { cb && cb({ error: careerResult.error }); return; }
+      const merge = (a, b) => (a || []).concat(b || []);
+      cb && cb({
+        pulled: merge(careerResult && careerResult.pulled, mpResult && mpResult.pulled),
+        pushed: merge(careerResult && careerResult.pushed, mpResult && mpResult.pushed),
+        conflicts: merge(careerResult && careerResult.conflicts, mpResult && mpResult.conflicts),
+      });
+    });
+  });
+}
+
 function doLinkGoogle(onDone) {
   const finishLink = () => {
     DUEL.linkGoogle((err, info) => {
@@ -2394,7 +2411,7 @@ function doLinkGoogle(onDone) {
       }
       PROFILE.rememberGoogleLinked();
       paintBrandCorner();
-      PROFILE.reconcileWithCloud((result) => {
+      reconcileAllWithCloud((result) => {
         /* si un vrai conflit doit être tranché, cet écran-là suffit
            comme confirmation — sinon on le dit explicitement, pour ne
            jamais laisser le joueur deviner si ça a marché. */
@@ -2473,9 +2490,18 @@ function resolveGoogleConflicts(result, cb) {
     chain: false,
     choices: [
       { h: "Garder celle-ci (cet appareil)", d: "Écrase la version du cloud.", t: "",
-        pick: () => { setActionEnabled(true); PROFILE.pushToCloud(next.id, () => resolveGoogleConflicts(result, cb)); } },
+        pick: () => {
+          setActionEnabled(true);
+          const push = next.kind === "character" ? DUEL.pushMpToCloud : PROFILE.pushToCloud;
+          push(next.id, () => resolveGoogleConflicts(result, cb));
+        } },
       { h: "Charger celle du cloud", d: "Remplace la version de cet appareil.", t: "",
-        pick: () => { setActionEnabled(true); PROFILE.applySnapshot(next.id, next.cSnap); resolveGoogleConflicts(result, cb); } },
+        pick: () => {
+          setActionEnabled(true);
+          if (next.kind === "character") DUEL.mpApplySnapshot(next.id, next.cSnap);
+          else PROFILE.applySnapshot(next.id, next.cSnap);
+          resolveGoogleConflicts(result, cb);
+        } },
     ],
   });
 }
@@ -2610,7 +2636,7 @@ function bootFinish() {
   if (PROFILE.wasGoogleLinked() && typeof DUEL !== "undefined") {
     DUEL.loadFirebaseSDK().then(() => {
       paintBrandCorner();
-      PROFILE.reconcileWithCloud((result) => {
+      reconcileAllWithCloud((result) => {
         if (!result || result.error) return;
         const onScreenBoot = !$("screen-boot").classList.contains("hidden");
         if (result.conflicts && result.conflicts.length) {

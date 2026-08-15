@@ -54,6 +54,7 @@ DUEL.getCharacter = function () {
 
 DUEL.setCharacter = function (c) {
   try { localStorage.setItem(PROFILE.key(DUEL.CHARACTER_KEY), JSON.stringify(c)); } catch (e) {}
+  DUEL.scheduleMpCloudPush();
 };
 
 DUEL.createCharacter = function (name, positionId) {
@@ -847,14 +848,23 @@ DUEL.googleLinkedInfo = function () {
    lien échoue avec credential-already-in-use. Plutôt que de laisser
    le joueur bloqué sans solution (« il n'y a pas moyen de se
    connecter à un compte existant »), on bascule directement dessus :
-   Firebase fournit le credential Google déjà validé sur l'erreur, il
-   suffit de s'y connecter avec pour adopter cet uid existant.
-   reconcileWithCloud (appelé juste après par l'appelant) rapatriera
-   ensuite ses carrières sur cet appareil, avec le même mécanisme de
-   fusion par horodatage qu'une resynchro multi-appareils normale. */
-DUEL._adoptExistingCredential = function (e, cb) {
-  if (e.code !== "auth/credential-already-in-use" || !e.credential) { cb(e); return; }
-  firebase.auth().signInWithCredential(e.credential)
+   il suffit de se connecter avec ce credential pour adopter cet uid
+   existant. reconcileWithCloud (appelé juste après par l'appelant)
+   rapatriera ensuite ses carrières sur cet appareil, avec le même
+   mécanisme de fusion par horodatage qu'une resynchro multi-appareils
+   normale.
+   `sentCredential` (celui qu'on vient de construire nous-mêmes dans
+   linkGoogle, pas `e.credential`) : avec un credential Google monté à
+   la main depuis un jeton GIS (plutôt qu'obtenu via le popup natif de
+   Firebase), Firebase ne réattache pas toujours le credential sur
+   l'erreur — s'appuyer dessus laissait la connexion échouer en silence
+   avec `credential-already-in-use` malgré ce garde-fou (observé en
+   usage réel le 2026-08-15). */
+DUEL._adoptExistingCredential = function (e, sentCredential, cb) {
+  if (e.code !== "auth/credential-already-in-use") { cb(e); return; }
+  const cred = e.credential || sentCredential;
+  if (!cred) { cb(e); return; }
+  firebase.auth().signInWithCredential(cred)
     .then((result) => { DUEL.uid = result.user.uid; cb(null, { email: result.user.email, name: result.user.displayName, switched: true }); })
     .catch((e2) => cb(e2));
 };
@@ -904,7 +914,7 @@ DUEL.linkGoogle = function (cb) {
         const credential = firebase.auth.GoogleAuthProvider.credential(null, resp.access_token);
         firebase.auth().currentUser.linkWithCredential(credential)
           .then((result) => cb(null, { email: result.user.email, name: result.user.displayName }))
-          .catch((e) => DUEL._adoptExistingCredential(e, cb));
+          .catch((e) => DUEL._adoptExistingCredential(e, credential, cb));
       },
       error_callback: (err) => {
         const t = err && err.type;
@@ -1242,6 +1252,7 @@ DUEL.getTokens = function () {
 DUEL.addTokens = function (n) {
   const v = Math.max(0, DUEL.getTokens() + n);
   try { localStorage.setItem(PROFILE.key(DUEL.TOKENS_KEY), String(v)); } catch (e) {}
+  DUEL.scheduleMpCloudPush();
   return v;
 };
 
@@ -1260,6 +1271,7 @@ DUEL.getEquipped = function (type) {
 DUEL.setEquipped = function (type, id) {
   try { localStorage.setItem(PROFILE.key(DUEL.EQUIP_KEYS[type]), id); } catch (e) {}
   DUEL.syncCosmetics();
+  DUEL.scheduleMpCloudPush();
 };
 
 /* Publie les cosmétiques équipés sur l'entrée du classement (nœud déjà
@@ -1308,6 +1320,109 @@ DUEL.buyItem = function (id) {
   try { localStorage.setItem(PROFILE.key(DUEL.OWNED_KEY), JSON.stringify(owned)); } catch (e) {}
   if (DUEL.EQUIP_KEYS[item.type]) DUEL.setEquipped(item.type, id);
   return { ok: true };
+};
+
+/* ═══════════════ synchro cloud du personnage multijoueur (compte Google) ═══════════════
+   Même principe que PROFILE.reconcileWithCloud pour la carrière solo
+   (voir profile.js) mais pour le personnage multijoueur, ses jetons et
+   ses cosmétiques — jusqu'ici purement locaux, donc perdus en changeant
+   d'appareil même une fois connecté avec le même compte Google. Un
+   instantané par compte local (id PROFILE), sous
+   parquet_mp_characters/<uid>/<idCompte>. */
+DUEL.CHARACTER_CLOUD_ROOT = "parquet_mp_characters";
+
+const mpSyncKey = (id) => "parquet_mp_sync_v1__" + id;
+DUEL.mpTouchedNow = function (id, ts) {
+  try { localStorage.setItem(mpSyncKey(id), String(ts || Date.now())); } catch (e) {}
+};
+DUEL.mpLastTouched = function (id) {
+  try { return Number(localStorage.getItem(mpSyncKey(id))) || 0; } catch (e) { return 0; }
+};
+
+DUEL._mpKey = function (base, id) { return "parquet_" + base + (id ? "__" + id : ""); };
+
+DUEL.mpSnapshot = function (id) {
+  let character = null, tokens = 0, owned = [];
+  try { character = JSON.parse(localStorage.getItem(DUEL._mpKey(DUEL.CHARACTER_KEY, id)) || "null"); } catch (e) {}
+  try { tokens = parseInt(localStorage.getItem(DUEL._mpKey(DUEL.TOKENS_KEY, id)) || "0", 10) || 0; } catch (e) {}
+  try { owned = JSON.parse(localStorage.getItem(DUEL._mpKey(DUEL.OWNED_KEY, id)) || "[]"); } catch (e) {}
+  if (!character && !tokens && !owned.length) return null;
+  const theme = localStorage.getItem(DUEL._mpKey(DUEL.EQUIP_KEYS.theme, id)) || "default";
+  const emblem = localStorage.getItem(DUEL._mpKey(DUEL.EQUIP_KEYS.emblem, id)) || "default";
+  const title = localStorage.getItem(DUEL._mpKey(DUEL.EQUIP_KEYS.title, id)) || "default";
+  return { character, tokens, owned, theme, emblem, title, updatedAt: DUEL.mpLastTouched(id) || Date.now() };
+};
+
+DUEL.mpApplySnapshot = function (id, snap) {
+  try {
+    if (snap.character) localStorage.setItem(DUEL._mpKey(DUEL.CHARACTER_KEY, id), JSON.stringify(snap.character));
+    localStorage.setItem(DUEL._mpKey(DUEL.TOKENS_KEY, id), String(snap.tokens || 0));
+    localStorage.setItem(DUEL._mpKey(DUEL.OWNED_KEY, id), JSON.stringify(snap.owned || []));
+    localStorage.setItem(DUEL._mpKey(DUEL.EQUIP_KEYS.theme, id), snap.theme || "default");
+    localStorage.setItem(DUEL._mpKey(DUEL.EQUIP_KEYS.emblem, id), snap.emblem || "default");
+    localStorage.setItem(DUEL._mpKey(DUEL.EQUIP_KEYS.title, id), snap.title || "default");
+  } catch (e) {}
+  DUEL.mpTouchedNow(id, snap.updatedAt);
+  if (PROFILE.activeId() === id) DUEL.syncCosmetics();
+};
+
+DUEL.pushMpToCloud = function (id, cb) {
+  if (!DUEL.ready()) { cb && cb(false); return; }
+  DUEL.ensureAuth((uid) => {
+    const snap = DUEL.mpSnapshot(id);
+    if (!snap) { cb && cb(false); return; }
+    snap.updatedAt = Date.now();
+    DUEL.db.ref(DUEL.CHARACTER_CLOUD_ROOT + "/" + uid + "/" + id).set(snap)
+      .then(() => { DUEL.mpTouchedNow(id, snap.updatedAt); cb && cb(true); })
+      .catch(() => cb && cb(false));
+  });
+};
+
+/* regroupe les écritures rapprochées (recordResult, achats boutique…)
+   en un seul envoi, même motif que PROFILE.scheduleCloudPush. */
+let DUEL_MP_PUSH_T = null;
+DUEL.scheduleMpCloudPush = function () {
+  if (typeof PROFILE === "undefined" || !PROFILE.wasGoogleLinked()) return;
+  const id = PROFILE.activeId();
+  if (!id) return;
+  clearTimeout(DUEL_MP_PUSH_T);
+  DUEL_MP_PUSH_T = setTimeout(() => DUEL.pushMpToCloud(id, () => {}), 2500);
+};
+
+/* même logique que PROFILE.reconcileWithCloud : ce que le cloud seul
+   connaît est téléchargé, ce que cet appareil seul connaît est envoyé,
+   un vrai conflit (versions différentes des deux côtés) est signalé
+   plutôt qu'écrasé en silence. */
+DUEL.reconcileMpWithCloud = function (cb) {
+  if (!DUEL.ready()) { cb && cb({ error: "unavailable" }); return; }
+  DUEL.ensureAuth((uid) => {
+    DUEL.db.ref(DUEL.CHARACTER_CLOUD_ROOT + "/" + uid).once("value")
+      .then((snap) => {
+        const cloud = snap.val() || {};
+        const localIds = PROFILE.list().map((p) => p.id);
+        const pulled = [], pushed = [], conflicts = [];
+
+        Object.keys(cloud).forEach((id) => {
+          const cSnap = cloud[id];
+          const localSnap = DUEL.mpSnapshot(id);
+          if (!localSnap) { DUEL.mpApplySnapshot(id, cSnap); pulled.push(id); return; }
+          const localAt = DUEL.mpLastTouched(id);
+          const cloudAt = cSnap.updatedAt || 0;
+          if (cloudAt > localAt + 2000) {
+            const prof = PROFILE.list().find((p) => p.id === id);
+            conflicts.push({ id, cloudAt, localAt, cSnap, kind: "character",
+              name: (prof ? prof.name : "ce compte") + " (multijoueur)" });
+          }
+        });
+
+        localIds.forEach((id) => {
+          if (!cloud[id] && DUEL.mpSnapshot(id)) { DUEL.pushMpToCloud(id, () => {}); pushed.push(id); }
+        });
+
+        cb && cb({ pulled, pushed, conflicts });
+      })
+      .catch((e) => cb && cb({ error: e.message }));
+  });
 };
 
 DUEL.availableTaunts = function () {
