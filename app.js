@@ -3254,13 +3254,14 @@ function duelOpenProfile(profile, attrsSource, backFn, isMine) {
 /* Onglet Boutique de l'accueil multijoueur — quatre familles d'objets
    cosmétiques (thèmes / emblèmes / titres / taunts), rendues dans le
    même conteneur générique que les autres onglets. */
-/* Emblèmes / titres / taunts retirés de la boutique pour se concentrer
-   sur les finitions de carte — leurs objets restent dans DUEL.SHOP_ITEMS
-   (rien de perdu), juste plus proposés ici tant que ce n'est pas
-   redemandé. */
+/* Titres / taunts restent retirés de la boutique — leurs objets
+   restent dans DUEL.SHOP_ITEMS (rien de perdu), juste plus proposés
+   ici tant que ce n'est pas redemandé. Emblèmes remis à la demande. */
 const DUEL_SHOP_CATEGORIES = [
   { type: "theme",  title: "Thèmes de couleur (carte profil)", equip: true,
     defaultItem: { id: "default", type: "theme", label: "Thème par défaut", cost: 0, color: "var(--gain)" } },
+  { type: "emblem", title: "Emblèmes (à côté du nom)", equip: true,
+    defaultItem: { id: "default", type: "emblem", label: "Aucun emblème", cost: 0, icon: "" } },
 ];
 
 function duelRenderShop(box) {
