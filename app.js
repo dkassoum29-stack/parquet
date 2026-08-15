@@ -3034,6 +3034,20 @@ function worldDrawHome() {
     });
   };
   profilCard.appendChild(redoBtn);
+  const wipeBtn = el("button", "btn btn-quiet btn-block", "Réinitialisation complète (perso + jetons + boutique)");
+  wipeBtn.onclick = () => {
+    ask({
+      kicker: "Confirmation", head: "Tout effacer et repartir de zéro ?",
+      body: "Personnage, jetons et objets de boutique possédés/équipés sont effacés sur cet appareil. Ta cote au classement général et tes amis ne sont pas touchés.",
+      chain: false,
+      choices: [
+        { h: "Non, annuler", d: "", t: "", pick: () => { setActionEnabled(true); worldDrawHome(); } },
+        { h: "Oui, tout effacer", d: "", t: "", danger: true,
+          pick: () => { setActionEnabled(true); DUEL.resetCharacter(); worldDrawCreateCharacter(); } },
+      ],
+    });
+  };
+  profilCard.appendChild(wipeBtn);
   content.appendChild(profilCard);
   }
 
@@ -3818,7 +3832,6 @@ function duelShowResult() {
   const oppName = (seats[otherSeat] && seats[otherSeat].name) || "Adversaire";
 
   DUEL.saveHistory({ at: Date.now(), code: DUEL_UI.code, opponent: oppName, won, tie, myScore, oppScore });
-  DUEL.recordResult(won, tie);
 
   show("screen-duel-result");
   const shell = $("duel-result-shell");
@@ -3828,13 +3841,33 @@ function duelShowResult() {
   hero.appendChild(el("div", "end-name", `${myName} ${myScore} – ${oppScore} ${oppName}`));
   shell.appendChild(hero);
 
+  /* On attend que le classement soit vraiment mis à jour avant de
+     laisser repartir — sinon l'écran d'accueil pouvait encore afficher
+     l'ancienne cote/V-N-D le temps que l'écriture Firebase (async,
+     lancée juste avant) arrive. Filet de 4s en cas de réseau lent :
+     jamais bloqué durablement sur cet écran. */
+  const waitNote = el("p", "duel-msg", "Mise à jour du classement…");
+  shell.appendChild(waitNote);
+
   const again = el("button", "btn btn-accent btn-block", "Retour au monde multijoueur");
+  again.disabled = true;
   again.onclick = () => { DUEL.deleteRoom(DUEL_UI.code); duelOpenLobby(); };
   shell.appendChild(again);
 
   const home = el("button", "btn btn-quiet btn-block", "Retour à l'accueil");
+  home.disabled = true;
   home.onclick = () => { DUEL.deleteRoom(DUEL_UI.code); duelReset(); show("screen-boot"); };
   shell.appendChild(home);
+
+  let settled = false;
+  const ready = () => {
+    if (settled) return;
+    settled = true;
+    again.disabled = false; home.disabled = false;
+    waitNote.remove();
+  };
+  DUEL.recordResult(won, tie, ready);
+  setTimeout(ready, 4000);
 }
 
 /* ═══════════════ MODE SAISON ═══════════════

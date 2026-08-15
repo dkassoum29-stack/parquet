@@ -1246,6 +1246,20 @@ DUEL.TOKENS_KEY = "mp_tokens_v1";
 DUEL.OWNED_KEY = "mp_owned_v1";
 DUEL.EQUIP_KEYS = { theme: "mp_theme_v1", emblem: "mp_emblem_v1", title: "mp_title_v1" };
 
+/* Repart complètement de zéro sur le personnage multijoueur de CE
+   profil : perso, jetons, cosmétiques possédés/équipés, pseudo local —
+   tout ce qui est purement local (voir plus haut). Plus radical que
+   « Nouveau joueur » (qui recrée juste l'avatar sans toucher jetons ni
+   boutique) — pensé pour repartir vraiment à zéro en test. Ne touche
+   jamais au classement public (parquet_leaderboard) ni aux amis/défis. */
+DUEL.resetCharacter = function () {
+  [DUEL.CHARACTER_KEY, DUEL.TOKENS_KEY, DUEL.OWNED_KEY,
+   DUEL.EQUIP_KEYS.theme, DUEL.EQUIP_KEYS.emblem, DUEL.EQUIP_KEYS.title,
+   "duel_alias_v1"].forEach((k) => {
+    try { localStorage.removeItem(PROFILE.key(k)); } catch (e) {}
+  });
+};
+
 DUEL.SHOP_ITEMS = [
   /* — thèmes de couleur (carte profil), façon tirages 2K MyTEAM —
      chacun a sa vraie finition dans parquet.css (.hero-theme-*), pas
@@ -1660,8 +1674,14 @@ DUEL.awardBadge = function (character, id, label) {
 /* Réservé aux vrais matchs contre une autre personne (Ami / Aléatoire) —
    c'est ce qui alimente le classement public, le rang, les badges à
    palier et les jetons. Les matchs de Saison (contre l'IA) ne doivent
-   JAMAIS passer par ici : voir DUEL.recordSeasonResult plus bas. */
-DUEL.recordResult = function (won, tie) {
+   JAMAIS passer par ici : voir DUEL.recordSeasonResult plus bas.
+
+   cb (optionnel) : appelé une fois l'écriture Firebase vraiment
+   passée — sans ça, DUEL.getMyProfile appelé juste après (typiquement
+   en revenant à l'accueil) pouvait relire l'ancienne cote/V-N-D si la
+   lecture arrivait avant que cette écriture asynchrone soit terminée
+   (constaté en usage réel : stats pas à jour après un match). */
+DUEL.recordResult = function (won, tie, cb) {
   DUEL.ensureAuth((uid) => {
     const ref = DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.playerKey(uid)}`);
     const c = DUEL.getCharacter();
@@ -1683,7 +1703,7 @@ DUEL.recordResult = function (won, tie) {
         emblem: DUEL.getEquipped("emblem"),
         title: DUEL.getEquipped("title"),
         updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      });
+      }).then(() => cb && cb()).catch(() => cb && cb());
       /* Toujours attribué (même palier bronze) : c'est ce badge, pas
          le palier affiché plus haut, qui débloque le coup signature
          via DUEL.signatureUsesForCharacter — voir plus bas. */
