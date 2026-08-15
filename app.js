@@ -3819,7 +3819,7 @@ function duelShowResult() {
   duelCheckPerfectBadge(won);
 
   if (DUEL_UI.mode === "ai") {
-    DUEL.recordSeasonResult(won);
+    DUEL.recordSeasonResult(won, tie);
     const onDone = DUEL_UI.aiOnDone;
     duelReset();
     if (onDone) onDone(won, tie, myScore, oppScore);

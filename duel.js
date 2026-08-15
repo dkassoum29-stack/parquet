@@ -1671,17 +1671,25 @@ DUEL.awardBadge = function (character, id, label) {
   return true;
 };
 
-/* Réservé aux vrais matchs contre une autre personne (Ami / Aléatoire) —
-   c'est ce qui alimente le classement public, le rang, les badges à
-   palier et les jetons. Les matchs de Saison (contre l'IA) ne doivent
-   JAMAIS passer par ici : voir DUEL.recordSeasonResult plus bas.
+/* Alimente le classement public, le rang, les badges à palier et les
+   jetons — pour les vrais matchs contre une autre personne (Ami /
+   Aléatoire) ET, depuis le choix explicite de l'utilisateur, pour les
+   matchs de Saison contre l'IA aussi (voir DUEL.recordSeasonResult,
+   simple relais vers ici avec des jetons plus modestes). Décision
+   assumée : la cote de rang mélange donc désormais résultats contre
+   IA et contre de vrais joueurs.
 
    cb (optionnel) : appelé une fois l'écriture Firebase vraiment
    passée — sans ça, DUEL.getMyProfile appelé juste après (typiquement
    en revenant à l'accueil) pouvait relire l'ancienne cote/V-N-D si la
    lecture arrivait avant que cette écriture asynchrone soit terminée
-   (constaté en usage réel : stats pas à jour après un match). */
-DUEL.recordResult = function (won, tie, cb) {
+   (constaté en usage réel : stats pas à jour après un match).
+
+   tokenRates (optionnel) : {win, tie, loss} — permet à
+   recordSeasonResult de créditer moins de jetons qu'un vrai match en
+   ligne sans dupliquer toute la logique de classement. */
+DUEL.recordResult = function (won, tie, cb, tokenRates) {
+  const rates = tokenRates || { win: 20, tie: 5, loss: 5 };
   DUEL.ensureAuth((uid) => {
     const ref = DUEL.db.ref(`${DUEL.LEADERBOARD_ROOT}/${DUEL.playerKey(uid)}`);
     const c = DUEL.getCharacter();
@@ -1713,20 +1721,19 @@ DUEL.recordResult = function (won, tie, cb) {
       /* Jetons de boutique : un peu à chaque match, un bonus si le
          palier de rang change (façon Rep NBA 2K qui récompense la
          montée de niveau). */
-      let earned = tie ? 5 : (won ? 20 : 5);
+      let earned = tie ? rates.tie : (won ? rates.win : rates.loss);
       if (DUEL.rankInfo(cur.rating || 100).label !== DUEL.rankInfo(newRating).label) earned += 50;
       DUEL.addTokens(earned);
     });
   });
 };
 
-/* Matchs de Saison (contre l'IA) : garde sa propre progression locale
-   (c.season.wins / c.season.losses, déjà tenue à jour ailleurs) et ne
-   touche jamais au classement public, au rang ni aux badges à palier —
-   uniquement quelques jetons, pour que la boutique reste utile en solo
-   aussi. */
-DUEL.recordSeasonResult = function (won) {
-  DUEL.addTokens(won ? 8 : 2);
+/* Matchs de Saison (contre l'IA) : même classement public/rang/badges
+   qu'un vrai match désormais (voir DUEL.recordResult ci-dessus),
+   uniquement moins de jetons — pour que grinder l'IA en Saison ne
+   rapporte pas autant que de vrais matchs Ami/Aléatoire. */
+DUEL.recordSeasonResult = function (won, tie, cb) {
+  DUEL.recordResult(won, tie, cb, { win: 8, tie: 4, loss: 2 });
 };
 
 DUEL.getMyRating = function (cb) {
