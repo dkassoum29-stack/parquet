@@ -1719,13 +1719,21 @@ DUEL.recordResult = function (won, tie, cb, tokenRates) {
         theme: DUEL.getEquipped("theme"),
         emblem: DUEL.getEquipped("emblem"),
         title: DUEL.getEquipped("title"),
-        updatedAt: firebase.database.ServerValue.TIMESTAMP,
       };
     }, (error, committed, snapshot) => {
       cb && cb();
       if (error || !committed) return;
       const final = snapshot ? snapshot.val() : null;
       if (!final) return;
+      /* firebase.database.ServerValue.TIMESTAMP (le sentinel horodatage
+         serveur) n'est pas fiable À L'INTÉRIEUR d'une transaction — le
+         SDK doit pouvoir recalculer/comparer la valeur localement pour
+         gérer les collisions, ce qu'un placeholder résolu côté serveur
+         seulement empêche. Utilisé là, il pouvait faire échouer toute
+         l'écriture en silence (constaté en usage réel : le nœud
+         parquet_leaderboard n'était même plus créé après un match). Un
+         update() séparé, hors transaction, n'a pas cette restriction. */
+      ref.update({ updatedAt: firebase.database.ServerValue.TIMESTAMP }).catch(() => {});
       /* Toujours attribué (même palier bronze) : c'est ce badge, pas
          le palier affiché plus haut, qui débloque le coup signature
          via DUEL.signatureUsesForCharacter — voir plus bas. */
