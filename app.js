@@ -3240,14 +3240,13 @@ function duelOpenProfile(profile, attrsSource, backFn, isMine) {
 /* Onglet Boutique de l'accueil multijoueur — quatre familles d'objets
    cosmétiques (thèmes / emblèmes / titres / taunts), rendues dans le
    même conteneur générique que les autres onglets. */
+/* Emblèmes / titres / taunts retirés de la boutique pour se concentrer
+   sur les finitions de carte — leurs objets restent dans DUEL.SHOP_ITEMS
+   (rien de perdu), juste plus proposés ici tant que ce n'est pas
+   redemandé. */
 const DUEL_SHOP_CATEGORIES = [
   { type: "theme",  title: "Thèmes de couleur (carte profil)", equip: true,
     defaultItem: { id: "default", type: "theme", label: "Thème par défaut", cost: 0, color: "var(--gain)" } },
-  { type: "emblem", title: "Emblèmes (à côté du nom)", equip: true,
-    defaultItem: { id: "default", type: "emblem", label: "Aucun emblème", cost: 0, icon: "" } },
-  { type: "title",  title: "Titres (sous le nom)", equip: true,
-    defaultItem: { id: "default", type: "title", label: "Aucun titre", cost: 0 } },
-  { type: "taunt",  title: "Taunts (chambrage Ami / Aléatoire)", equip: false },
 ];
 
 function duelRenderShop(box) {
@@ -3309,14 +3308,20 @@ function duelRenderShop(box) {
   box.appendChild(msg);
 }
 
-/* Aperçu avant achat : ma vraie carte (nom, OVR, rang, badges déjà
-   acquis), juste avec cet objet-là appliqué à la place de l'équipé
-   actuel — rien n'est acheté ni équipé, on réutilise l'écran de
-   profil existant tel quel. */
+/* Aperçu avant achat : un simple coup d'œil, pas une navigation — ma
+   vraie carte (nom, OVR, rang, badges déjà acquis) avec cet objet-là
+   appliqué à la place de l'équipé actuel, dans une fenêtre légère
+   par-dessus la boutique. Rien n'est acheté ni équipé ; toucher
+   n'importe où la referme et on reprend exactement où on était. */
 function duelPreviewItem(cat, item) {
   DUEL.getMyProfile((profile) => {
     const preview = Object.assign({}, profile, { [cat.type]: item.id });
-    duelOpenProfile(preview, DUEL.getCharacter(), () => { show("screen-duel-lobby"); worldDrawHome(); }, true);
+    const posLabel = (DATA.POSITIONS.find((p) => p.id === preview.position) || {}).label || "";
+    const overlay = el("div", "duel-preview-overlay");
+    overlay.appendChild(duelBuildHeroCard(preview.name, posLabel, preview.ovr, preview, true, true));
+    overlay.appendChild(el("p", "duel-preview-hint", "Touche l'écran pour fermer"));
+    overlay.onclick = () => overlay.remove();
+    document.body.appendChild(overlay);
   });
 }
 
@@ -4109,6 +4114,22 @@ function worldRenderBracket(box, c, s) {
 document.addEventListener("DOMContentLoaded", () => {
   document.body.insertAdjacentHTML("afterbegin", MANGA.DEFS_SVG);
   boot();
+
+  /* Crédit de jetons pour tester la boutique sans jouer des dizaines de
+     matchs : visiter une fois l'adresse avec ?jetons=<nombre> (profil
+     actif requis). Purement local, aucune valeur réelle. Retiré de
+     l'URL aussitôt après pour ne pas recréditer à chaque rechargement
+     de la page si elle reste dans l'historique/en favori. */
+  const jetonsParam = new URLSearchParams(location.search).get("jetons");
+  if (jetonsParam && PROFILE.active() && typeof DUEL !== "undefined") {
+    const n = parseInt(jetonsParam, 10);
+    if (n > 0) {
+      DUEL.addTokens(n);
+      const url = new URL(location.href);
+      url.searchParams.delete("jetons");
+      history.replaceState(null, "", url);
+    }
+  }
 
   /* Les boîtes de dialogue natives (confirm) sont bloquées dans une page
      embarquée : elles renvoient false sans rien afficher, et le bouton

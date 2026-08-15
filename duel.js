@@ -1750,9 +1750,16 @@ DUEL.buildProfile = function (entry, character, fallbackName) {
     position: (entry && entry.position) || (c ? c.position : null),
     ovr: (entry && entry.ovr != null) ? entry.ovr : (c ? ENG.ovr(c) : null),
     badges: (entry && entry.badges) || (c && c.badges ? c.badges.map((bd) => bd.label || bd) : []),
-    theme: (entry && entry.theme) || (c ? DUEL.getEquipped("theme") : "default"),
-    emblem: (entry && entry.emblem) || (c ? DUEL.getEquipped("emblem") : "default"),
-    title: (entry && entry.title) || (c ? DUEL.getEquipped("title") : "default"),
+    /* Pour ma propre carte (c fourni), l'équipement local est toujours
+       la vérité la plus fraîche — l'entrée du classement n'est qu'un
+       miroir public republié après coup (syncCosmetics), qui peut
+       traîner d'un battement. Sans ça, rééquiper un thème pouvait
+       encore afficher l'ancien sur le classement/profil complet/accueil
+       tant que ce miroir n'avait pas rattrapé. Pour la carte de
+       quelqu'un d'autre (c absent), l'entrée reste la seule source. */
+    theme: (c ? DUEL.getEquipped("theme") : (entry && entry.theme)) || "default",
+    emblem: (c ? DUEL.getEquipped("emblem") : (entry && entry.emblem)) || "default",
+    title: (c ? DUEL.getEquipped("title") : (entry && entry.title)) || "default",
   };
 };
 
