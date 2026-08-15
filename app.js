@@ -3230,50 +3230,59 @@ function duelOpenProfile(profile, attrsSource, backFn, isMine) {
      au potentiel du personnage comme avant. */
   const attrs = attrsSource && attrsSource.attrs;
   if (attrs) {
-    const cap = ENG.clamp((attrsSource && attrsSource.potential) || 75, 30, 99);
-    const pool = isMine ? (attrsSource.attrPoints || 0) : 0;
     const attrsCard = el("div", "card duel-mode-card");
-    const attrsHead = el("div", "profiles-head");
-    attrsHead.appendChild(el("div", "card-title", "Attributs"));
-    if (isMine) attrsHead.appendChild(el("div", "duel-msg", pool > 0 ? pool + " point" + (pool > 1 ? "s" : "") + " à répartir" : "Aucun point à répartir pour l'instant"));
-    attrsCard.appendChild(attrsHead);
-    const attrsBody = el("div", "attrs-body");
-    const refresh = () => DUEL.getMyProfile((p) => duelOpenProfile(p, DUEL.getCharacter(), backFn, true));
-    DATA.ATTR_GROUPS.forEach((g) => {
-      const sect = el("div");
-      sect.appendChild(el("div", "attr-group-name", g.label));
-      DATA.ATTRS.filter((a) => a.g === g.id).forEach((a) => {
-        const v = Math.round(attrs[a.id] || 0);
-        const attrRow = el("div", "attr" + (isMine ? " attr-editable" : ""));
-        attrRow.appendChild(el("span", "attr-n", a.label));
-        if (isMine) {
-          const minus = el("button", "btn-icon attr-minus", "−");
-          minus.disabled = v <= 0;
-          minus.title = "Reprendre un point";
-          minus.setAttribute("aria-label", "Reprendre un point en " + a.label);
-          minus.onclick = () => { if (DUEL.refundAttrPoint(attrsSource, a.id)) refresh(); };
-          attrRow.appendChild(minus);
-        }
-        const bar = el("span", "attr-bar");
-        const fill = el("i", tierClass(v));
-        fill.style.width = v + "%";
-        bar.appendChild(fill);
-        attrRow.appendChild(bar);
-        if (isMine) {
-          const atCap = v >= cap;
-          const plus = el("button", "btn-icon attr-plus", "+");
-          plus.disabled = pool <= 0 || atCap;
-          plus.title = atCap ? "Potentiel atteint pour cet attribut" : "Ajouter un point";
-          plus.setAttribute("aria-label", "Ajouter un point en " + a.label);
-          plus.onclick = () => { if (DUEL.spendAttrPoint(attrsSource, a.id)) refresh(); };
-          attrRow.appendChild(plus);
-        }
-        attrRow.appendChild(el("span", "attr-v", v));
-        sect.appendChild(attrRow);
+    /* Dépenser/reprendre un point ne touche que les données locales
+       (attrsSource est déjà l'objet vivant, muté en place par
+       DUEL.spendAttrPoint/refundAttrPoint) — on redessine juste cette
+       carte sur place plutôt que de repasser par duelOpenProfile en
+       entier (show() + un aller-retour Firebase inutile), qui remettait
+       la page en haut à chaque clic sur mobile. */
+    const renderAttrs = () => {
+      attrsCard.innerHTML = "";
+      const cap = ENG.clamp((attrsSource && attrsSource.potential) || 75, 30, 99);
+      const pool = isMine ? (attrsSource.attrPoints || 0) : 0;
+      const attrsHead = el("div", "profiles-head");
+      attrsHead.appendChild(el("div", "card-title", "Attributs"));
+      if (isMine) attrsHead.appendChild(el("div", "duel-msg", pool > 0 ? pool + " point" + (pool > 1 ? "s" : "") + " à répartir" : "Aucun point à répartir pour l'instant"));
+      attrsCard.appendChild(attrsHead);
+      const attrsBody = el("div", "attrs-body");
+      DATA.ATTR_GROUPS.forEach((g) => {
+        const sect = el("div");
+        sect.appendChild(el("div", "attr-group-name", g.label));
+        DATA.ATTRS.filter((a) => a.g === g.id).forEach((a) => {
+          const v = Math.round(attrs[a.id] || 0);
+          const attrRow = el("div", "attr" + (isMine ? " attr-editable" : ""));
+          attrRow.appendChild(el("span", "attr-n", a.label));
+          if (isMine) {
+            const minus = el("button", "btn-icon attr-minus", "−");
+            minus.disabled = v <= 0;
+            minus.title = "Reprendre un point";
+            minus.setAttribute("aria-label", "Reprendre un point en " + a.label);
+            minus.onclick = () => { if (DUEL.refundAttrPoint(attrsSource, a.id)) renderAttrs(); };
+            attrRow.appendChild(minus);
+          }
+          const bar = el("span", "attr-bar");
+          const fill = el("i", tierClass(v));
+          fill.style.width = v + "%";
+          bar.appendChild(fill);
+          attrRow.appendChild(bar);
+          if (isMine) {
+            const atCap = v >= cap;
+            const plus = el("button", "btn-icon attr-plus", "+");
+            plus.disabled = pool <= 0 || atCap;
+            plus.title = atCap ? "Potentiel atteint pour cet attribut" : "Ajouter un point";
+            plus.setAttribute("aria-label", "Ajouter un point en " + a.label);
+            plus.onclick = () => { if (DUEL.spendAttrPoint(attrsSource, a.id)) renderAttrs(); };
+            attrRow.appendChild(plus);
+          }
+          attrRow.appendChild(el("span", "attr-v", v));
+          sect.appendChild(attrRow);
+        });
+        attrsBody.appendChild(sect);
       });
-      attrsBody.appendChild(sect);
-    });
-    attrsCard.appendChild(attrsBody);
+      attrsCard.appendChild(attrsBody);
+    };
+    renderAttrs();
     box.appendChild(attrsCard);
   }
 }
