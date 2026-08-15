@@ -1247,17 +1247,20 @@ DUEL.OWNED_KEY = "mp_owned_v1";
 DUEL.EQUIP_KEYS = { theme: "mp_theme_v1", emblem: "mp_emblem_v1", title: "mp_title_v1" };
 
 DUEL.SHOP_ITEMS = [
-  /* — thèmes de couleur (carte profil) — */
-  { id: "theme-fire",   type: "theme", label: "Thème Feu",      cost: 80,  color: "var(--leather)" },
-  { id: "theme-ice",    type: "theme", label: "Thème Glace",    cost: 80,  color: "var(--teal)" },
-  { id: "theme-blood",  type: "theme", label: "Thème Sang",     cost: 120, color: "var(--loss)" },
-  { id: "theme-night",  type: "theme", label: "Thème Nuit",     cost: 120, color: "#3B5BA5" },
-  { id: "theme-royal",  type: "theme", label: "Thème Royal",    cost: 150, color: "var(--grape)" },
-  { id: "theme-neon",   type: "theme", label: "Thème Néon",     cost: 180, color: "#39FF88" },
-  { id: "theme-pink",   type: "theme", label: "Thème Rose",     cost: 180, color: "#E85CA0" },
-  { id: "theme-gold",   type: "theme", label: "Thème Or",       cost: 220, color: "var(--gold)" },
-  { id: "theme-chrome", type: "theme", label: "Thème Chrome",   cost: 250, color: "#B9C0C6" },
-  { id: "theme-onyx",   type: "theme", label: "Thème Onyx",     cost: 300, color: "#4A433B" },
+  /* — thèmes de couleur (carte profil), façon tirages 2K MyTEAM —
+     chacun a sa vraie finition dans parquet.css (.hero-theme-*), pas
+     juste une couleur : color ici sert seulement de teinte pour la
+     puce de la liste boutique et la bordure de la carte jetons. */
+  { id: "theme-corail",    type: "theme", label: "Aube Corail",         cost: 90,  color: "#FF8B6B" },
+  { id: "theme-chrome",    type: "theme", label: "Chrome Platine",      cost: 110, color: "#AEB4B8" },
+  { id: "theme-emeraude",  type: "theme", label: "Émeraude Franchise",  cost: 130, color: "#2E9E68" },
+  { id: "theme-sang",      type: "theme", label: "Sang Écarlate",       cost: 150, color: "#B32B2B" },
+  { id: "theme-ambre",     type: "theme", label: "Ambre Prestige",      cost: 170, color: "#E2622C" },
+  { id: "theme-neon",      type: "theme", label: "Néon Rétro",          cost: 190, color: "#10A0A0" },
+  { id: "theme-glacier",   type: "theme", label: "Glacier Diamant",     cost: 210, color: "#10A0A0" },
+  { id: "theme-onyx",      type: "theme", label: "Onyx Élite",          cost: 230, color: "#C9C2B4" },
+  { id: "theme-amethyste", type: "theme", label: "Améthyste Royale",    cost: 260, color: "#6D4FBE" },
+  { id: "theme-opale",     type: "theme", label: "Opale Galactique",    cost: 320, color: "#E3B23C" },
 
   /* — emblèmes (affichés à côté du nom) — */
   { id: "emblem-goat",   type: "emblem", label: "GOAT",       cost: 30, icon: "🐐" },

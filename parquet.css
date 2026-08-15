@@ -1647,13 +1647,31 @@ button { font: inherit; color: inherit; }
 .duel-challenge-banner { border-color: var(--accent); }
 
 .duel-hero-card {
+  /* jeu de variables : le thème par défaut (aucun objet équipé) s'appuie
+     dessus telles quelles ; chaque .hero-theme-* (plus bas) ne fait que
+     les redéfinir, plus un fond et un liseré à lui — pas de duplication
+     de règles par thème. */
   --hero-accent: var(--gain);
+  --hero-bg: var(--surface);
+  --hero-glow: color-mix(in srgb, var(--hero-accent) 18%, transparent);
+  --hero-border: color-mix(in srgb, var(--hero-accent) 45%, var(--line-soft));
+  --hero-name-c: var(--text);
+  --hero-sub-c: var(--text-3);
+  --hero-title-c: var(--gold);
+  --hero-ovr-c: var(--hero-accent);
+  --hero-ovr-label-c: var(--text-3);
+  --hero-emblem-bg: color-mix(in srgb, var(--hero-accent) 22%, var(--bg-sunk));
+  --hero-stat-label-c: var(--text-3);
+  --hero-stat-value-c: var(--gain);
+  --hero-divider-c: var(--line-soft);
+  --hero-bar-track: var(--bg-sunk);
+  --hero-bar-fill-c: var(--hero-accent);
+  --hero-next-c: var(--text-3);
+
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(130% 150% at 100% -10%, color-mix(in srgb, var(--hero-accent) 18%, transparent), transparent 62%),
-    var(--surface);
-  border: 1px solid color-mix(in srgb, var(--hero-accent) 45%, var(--line-soft));
+  background: radial-gradient(130% 150% at 100% -10%, var(--hero-glow), transparent 62%), var(--hero-bg);
+  border: 1px solid var(--hero-border);
   border-radius: var(--r-lg);
   padding: 20px;
   margin-bottom: 18px;
@@ -1664,29 +1682,29 @@ button { font: inherit; color: inherit; }
 .duel-hero-emblem {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: 50%; flex: none;
-  background: color-mix(in srgb, var(--hero-accent) 22%, var(--bg-sunk));
+  background: var(--hero-emblem-bg);
   font-size: 15px;
 }
-.duel-hero-name { font-family: var(--f-display); font-size: 22px; line-height: 1.15; letter-spacing: .01em; }
-.duel-hero-pos { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
-.duel-hero-title { font-size: 12px; font-style: italic; color: var(--gold); margin-top: 4px; }
+.duel-hero-name { font-family: var(--f-display); font-size: 22px; line-height: 1.15; letter-spacing: .01em; color: var(--hero-name-c); }
+.duel-hero-pos { font-size: 12.5px; color: var(--hero-sub-c); margin-top: 4px; }
+.duel-hero-title { font-size: 12px; font-style: italic; color: var(--hero-title-c); margin-top: 4px; }
 .duel-hero-ovr-wrap { text-align: right; }
-.duel-hero-ovr { font-family: var(--f-mono); font-size: 27px; font-weight: 800; line-height: 1; color: var(--hero-accent); }
-.duel-hero-ovr-label { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); text-align: right; margin-top: 4px; }
+.duel-hero-ovr { font-family: var(--f-mono); font-size: 27px; font-weight: 800; line-height: 1; color: var(--hero-ovr-c); }
+.duel-hero-ovr-label { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--hero-ovr-label-c); text-align: right; margin-top: 4px; }
 .duel-hero-tokens { font-family: var(--f-mono); font-size: 12px; color: var(--gold); text-align: right; margin-top: 8px; }
 .duel-hero-stats {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 26px;
-  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft);
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--hero-divider-c);
 }
 .duel-hero-stat { flex: 0 0 auto; min-width: 56px; text-align: center; }
-.duel-hero-stat-label { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
-.duel-hero-stat-value { font-family: var(--f-mono); font-size: 16px; font-weight: 700; color: var(--gain); font-variant-numeric: tabular-nums; }
-.duel-rank-bar { height: 7px; border-radius: 4px; background: var(--bg-sunk); overflow: hidden; margin-top: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
-.duel-rank-bar-fill { display: block; height: 100%; border-radius: 4px; transition: width .4s ease; }
-.duel-rank-next { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+.duel-hero-stat-label { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--hero-stat-label-c); margin-bottom: 4px; }
+.duel-hero-stat-value { font-family: var(--f-mono); font-size: 16px; font-weight: 700; color: var(--hero-stat-value-c); font-variant-numeric: tabular-nums; }
+.duel-rank-bar { height: 7px; border-radius: 4px; background: var(--hero-bar-track); overflow: hidden; margin-top: 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
+.duel-rank-bar-fill { display: block; height: 100%; border-radius: 4px; transition: width .4s ease; background: var(--hero-bar-fill-c); }
+.duel-rank-next { font-size: 11px; color: var(--hero-next-c); margin-top: 6px; }
 .duel-hero-trophies {
   display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px;
-  padding-top: 14px; border-top: 1px solid var(--line-soft);
+  padding-top: 14px; border-top: 1px solid var(--hero-divider-c);
 }
 .duel-badge {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1702,6 +1720,189 @@ button { font: inherit; color: inherit; }
 .duel-hero-card-lg .duel-hero-emblem { width: 34px; height: 34px; font-size: 18px; }
 .duel-hero-card-lg .duel-hero-ovr { font-size: 34px; }
 .duel-hero-card-lg .duel-hero-stat-value { font-size: 18px; }
+
+/* ═══════════════ finitions de carte (boutique, façon tirages 2K MyTEAM) ═══════════════
+   Chaque thème acheté redéfinit juste les variables ci-dessus (fond,
+   liseré, couleurs de texte) plutôt que de dupliquer les règles — voir
+   .duel-hero-card pour la liste complète des variables disponibles. */
+
+.hero-theme-corail {
+  --hero-bg: linear-gradient(150deg, #FFB199 0%, #FF8B6B 45%, #FFD37A 120%);
+  --hero-border: #FFD9C4;
+  --hero-glow: transparent;
+  --hero-name-c: #5A2A16; --hero-sub-c: #7A4227; --hero-title-c: #7A4227;
+  --hero-ovr-c: #5A2A16; --hero-ovr-label-c: #7A4227;
+  --hero-emblem-bg: rgba(90,42,22,.14);
+  --hero-stat-label-c: #7A4227; --hero-stat-value-c: #4A2110;
+  --hero-divider-c: rgba(90,42,22,.18);
+  --hero-bar-track: rgba(90,42,22,.16); --hero-bar-fill-c: #5A2A16;
+  --hero-next-c: #7A4227;
+}
+
+.hero-theme-chrome {
+  --hero-bg: linear-gradient(150deg, #6b7278 0%, #aeb4b8 45%, #7d848a 75%, #c7ccce 100%);
+  --hero-border: #d8dbdc;
+  --hero-glow: transparent;
+  --hero-name-c: #1B1813; --hero-sub-c: #3a3530; --hero-title-c: #3a3530;
+  --hero-ovr-c: #1B1813; --hero-ovr-label-c: #3a3530;
+  --hero-emblem-bg: rgba(0,0,0,.18);
+  --hero-stat-label-c: #3a3530; --hero-stat-value-c: #1B1813;
+  --hero-divider-c: rgba(0,0,0,.2);
+  --hero-bar-track: rgba(0,0,0,.22); --hero-bar-fill-c: #1B1813;
+  --hero-next-c: #3a3530;
+}
+.hero-theme-chrome::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(100deg, rgba(255,255,255,.22) 0px, rgba(255,255,255,.22) 2px, transparent 2px, transparent 14px);
+}
+
+.hero-theme-emeraude {
+  --hero-bg: linear-gradient(160deg, #0E3B28 0%, #1E7A50 55%, #2E9E68 130%);
+  --hero-border: #3FBE85;
+  --hero-glow: transparent;
+  --hero-name-c: #F1FFF7; --hero-sub-c: #A9E8CB; --hero-title-c: #A9E8CB;
+  --hero-ovr-c: #C9F2DD; --hero-ovr-label-c: #A9E8CB;
+  --hero-emblem-bg: rgba(255,255,255,.14);
+  --hero-stat-label-c: #A9E8CB; --hero-stat-value-c: #F1FFF7;
+  --hero-divider-c: rgba(255,255,255,.18);
+  --hero-bar-track: rgba(0,0,0,.28); --hero-bar-fill-c: #C9F2DD;
+  --hero-next-c: #A9E8CB;
+}
+.hero-theme-emeraude::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(70% 55% at 100% 0%, rgba(255,255,255,.16), transparent 60%);
+}
+
+.hero-theme-sang {
+  --hero-bg: linear-gradient(155deg, #6E0F14 0%, #B32B2B 55%, #7A1414 130%);
+  --hero-border: #D65959;
+  --hero-glow: transparent;
+  --hero-name-c: #FFF1F1; --hero-sub-c: #FFB9B9; --hero-title-c: #FFB9B9;
+  --hero-ovr-c: #FFD9D9; --hero-ovr-label-c: #FFB9B9;
+  --hero-emblem-bg: rgba(0,0,0,.3);
+  --hero-stat-label-c: #FFB9B9; --hero-stat-value-c: #FFF1F1;
+  --hero-divider-c: rgba(255,255,255,.16);
+  --hero-bar-track: rgba(0,0,0,.35); --hero-bar-fill-c: #FFD9D9;
+  --hero-next-c: #FFB9B9;
+}
+.hero-theme-sang::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 100% at 50% 120%, rgba(0,0,0,.55), transparent 60%);
+}
+
+.hero-theme-ambre {
+  --hero-bg: linear-gradient(160deg, #7A2E12 0%, #C24E1F 42%, #F3874F 100%);
+  --hero-border: #FFD9BE;
+  --hero-glow: transparent;
+  --hero-name-c: #FFF3E9; --hero-sub-c: #FFD9BE; --hero-title-c: #FFD9BE;
+  --hero-ovr-c: #FFF0E4; --hero-ovr-label-c: #FFD9BE;
+  --hero-emblem-bg: rgba(0,0,0,.24);
+  --hero-stat-label-c: #FFD9BE; --hero-stat-value-c: #FFF3E9;
+  --hero-divider-c: rgba(255,255,255,.18);
+  --hero-bar-track: rgba(0,0,0,.3); --hero-bar-fill-c: #FFD9BE;
+  --hero-next-c: #FFD9BE;
+}
+.hero-theme-ambre::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(-35deg, rgba(0,0,0,.1) 0px, rgba(0,0,0,.1) 1px, transparent 1px, transparent 10px);
+  mix-blend-mode: multiply;
+}
+
+.hero-theme-neon {
+  --hero-bg: linear-gradient(135deg, #170B2E 0%, #2A1250 45%, #0B2E3A 100%);
+  --hero-border: #10A0A0;
+  --hero-glow: transparent;
+  --hero-name-c: #EAF9F9; --hero-sub-c: #C9A6FF; --hero-title-c: #C9A6FF;
+  --hero-ovr-c: #10A0A0; --hero-ovr-label-c: #C9A6FF;
+  --hero-emblem-bg: rgba(16,160,160,.22);
+  --hero-stat-label-c: #C9A6FF; --hero-stat-value-c: #EAF9F9;
+  --hero-divider-c: rgba(16,160,160,.3);
+  --hero-bar-track: rgba(0,0,0,.35); --hero-bar-fill-c: #10A0A0;
+  --hero-next-c: #C9A6FF;
+}
+.hero-theme-neon::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(16,160,160,.14) 0px, transparent 1px, transparent 22px),
+    repeating-linear-gradient(90deg, rgba(109,79,190,.14) 0px, transparent 1px, transparent 22px);
+}
+.hero-theme-neon .duel-hero-ovr { text-shadow: 0 0 12px rgba(16,160,160,.7); }
+
+.hero-theme-glacier {
+  --hero-bg: linear-gradient(150deg, #0B3B3E 0%, #10A0A0 55%, #B9EFEF 145%);
+  --hero-border: #D6FBFB;
+  --hero-glow: transparent;
+  --hero-name-c: #F2FFFF; --hero-sub-c: #D6FBFB; --hero-title-c: #D6FBFB;
+  --hero-ovr-c: #F2FFFF; --hero-ovr-label-c: #D6FBFB;
+  --hero-emblem-bg: rgba(255,255,255,.18);
+  --hero-stat-label-c: #D6FBFB; --hero-stat-value-c: #F2FFFF;
+  --hero-divider-c: rgba(255,255,255,.22);
+  --hero-bar-track: rgba(0,0,0,.22); --hero-bar-fill-c: #F2FFFF;
+  --hero-next-c: #D6FBFB;
+}
+.hero-theme-glacier::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 20%, rgba(255,255,255,.35) 32%, transparent 44%),
+    linear-gradient(65deg, transparent 60%, rgba(255,255,255,.16) 72%, transparent 84%);
+}
+
+.hero-theme-onyx {
+  --hero-bg: linear-gradient(155deg, #1b1813 0%, #0d0b08 60%, #050403 100%);
+  --hero-border: #3a352c;
+  --hero-glow: transparent;
+  --hero-name-c: #F1ECE3; --hero-sub-c: #ACA396; --hero-title-c: #C9C2B4;
+  --hero-ovr-c: #E8E5E0; --hero-ovr-label-c: #ACA396;
+  --hero-emblem-bg: rgba(232,229,224,.1);
+  --hero-stat-label-c: #ACA396; --hero-stat-value-c: #F1ECE3;
+  --hero-divider-c: rgba(255,255,255,.14);
+  --hero-bar-track: rgba(0,0,0,.35); --hero-bar-fill-c: #E8E5E0;
+  --hero-next-c: #ACA396;
+}
+.hero-theme-onyx::after {
+  content: ""; position: absolute; inset: 6px; border: 1px solid rgba(232,229,224,.16);
+  border-radius: 10px; pointer-events: none;
+}
+
+.hero-theme-amethyste {
+  --hero-bg: linear-gradient(165deg, #4A3585 0%, #6D4FBE 55%, #3A2A66 120%);
+  --hero-border: #D9B65C;
+  --hero-glow: transparent;
+  --hero-name-c: #F5EFFF; --hero-sub-c: #C9B8F0; --hero-title-c: #F0C863;
+  --hero-ovr-c: #F0C863; --hero-ovr-label-c: #C9B8F0;
+  --hero-emblem-bg: rgba(227,178,60,.22);
+  --hero-stat-label-c: #C9B8F0; --hero-stat-value-c: #F5EFFF;
+  --hero-divider-c: rgba(255,255,255,.18);
+  --hero-bar-track: rgba(0,0,0,.3); --hero-bar-fill-c: #E3B23C;
+  --hero-next-c: #C9B8F0;
+}
+.hero-theme-amethyste::after {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, transparent, #F0C863, #E3B23C, #F0C863, transparent);
+  pointer-events: none;
+}
+
+.hero-theme-opale {
+  --hero-border: #FFE8B8;
+  --hero-glow: transparent;
+  --hero-name-c: #FFFFFF; --hero-sub-c: #FFF6E8; --hero-title-c: #FFF6E8;
+  --hero-ovr-c: #FFFFFF; --hero-ovr-label-c: #FFF6E8;
+  --hero-emblem-bg: rgba(255,255,255,.2);
+  --hero-stat-label-c: #FFF6E8; --hero-stat-value-c: #FFFFFF;
+  --hero-divider-c: rgba(255,255,255,.28);
+  --hero-bar-track: rgba(0,0,0,.28); --hero-bar-fill-c: #FFFFFF;
+  --hero-next-c: #FFF6E8;
+  background:
+    radial-gradient(60% 50% at 30% 0%, rgba(255,255,255,.28), transparent 60%),
+    linear-gradient(100deg, #10A0A0 0%, #6D4FBE 30%, #E2622C 62%, #E3B23C 88%, #10A0A0 112%);
+  background-size: auto, 220% 220%;
+  animation: opale-shift 10s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .hero-theme-opale { animation: none; background-position: 0 0, 15% 45%; } }
+@keyframes opale-shift {
+  0%, 100% { background-position: 0 0, 15% 45%; }
+  50% { background-position: 0 0, 85% 55%; }
+}
 
 .duel-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
 .duel-tab {

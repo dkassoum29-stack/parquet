@@ -2828,8 +2828,9 @@ function worldDrawCreateCharacter() {
 
 /* ─── carte joueur façon REP NBA 2K : rang coloré + barre de progression + badge de victoires à palier ─── */
 function duelBuildHeroCard(name, bioLine, ovr, profile, big, isMine) {
-  const hero = el("div", "duel-hero-card" + (big ? " duel-hero-card-lg" : ""));
-  hero.style.setProperty("--hero-accent", DUEL.themeColorFor(profile.theme || "default"));
+  const themeId = profile.theme || "default";
+  const themeClass = themeId === "default" ? "" : " hero-theme-" + themeId.replace(/^theme-/, "");
+  const hero = el("div", "duel-hero-card" + (big ? " duel-hero-card-lg" : "") + themeClass);
   const heroTop = el("div", "duel-hero-top");
   const heroId = el("div");
   const nameRow = el("div", "duel-hero-name-row");
@@ -3276,6 +3277,13 @@ function duelRenderShop(box) {
       const owned = item.cost === 0 || DUEL.isOwned(item.id);
       const isActive = cat.equip && DUEL.getEquipped(cat.type) === item.id;
       const btnGroup = el("div", "duel-friend-actions");
+      if (cat.equip && item.id !== "default") {
+        const previewBtn = el("button", "btn-icon", "👁");
+        previewBtn.setAttribute("aria-label", "Aperçu de " + item.label);
+        previewBtn.title = "Aperçu";
+        previewBtn.onclick = () => duelPreviewItem(cat, item);
+        btnGroup.appendChild(previewBtn);
+      }
       if (!owned) {
         const buyBtn = el("button", "btn btn-quiet", `Acheter — ${item.cost} 🪙`);
         buyBtn.onclick = () => {
@@ -3299,6 +3307,17 @@ function duelRenderShop(box) {
   });
 
   box.appendChild(msg);
+}
+
+/* Aperçu avant achat : ma vraie carte (nom, OVR, rang, badges déjà
+   acquis), juste avec cet objet-là appliqué à la place de l'équipé
+   actuel — rien n'est acheté ni équipé, on réutilise l'écran de
+   profil existant tel quel. */
+function duelPreviewItem(cat, item) {
+  DUEL.getMyProfile((profile) => {
+    const preview = Object.assign({}, profile, { [cat.type]: item.id });
+    duelOpenProfile(preview, DUEL.getCharacter(), () => { show("screen-duel-lobby"); worldDrawHome(); }, true);
+  });
 }
 
 function duelDrawWaiting() {
