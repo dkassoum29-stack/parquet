@@ -868,7 +868,7 @@ DUEL._adoptExistingCredential = function (e, sentCredential, cb) {
     .then((result) => { DUEL.uid = result.user.uid; cb(null, { email: result.user.email, name: result.user.displayName, switched: true }); })
     .catch((e2) => {
       console.error("Adoption Google (signInWithCredential) a échoué :", e2);
-      cb({ code: e2.code || "auth/adopt-failed", message: "adoption échouée" + (e2.message ? " : " + e2.message : "") });
+      cb({ code: "auth/adopt-failed", detail: e2.code || (e2.message || "").slice(0, 60) });
     });
 };
 

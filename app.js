@@ -2377,7 +2377,8 @@ function googleErrorLabel(err) {
     : err.code === "auth/network-request-failed" ? "Vérifie ta connexion internet et réessaie."
     : err.code === "auth/too-many-requests" ? "Trop de tentatives récentes, réessaie dans quelques minutes."
     : err.code === "auth/user-disabled" ? "Ce compte Google a été désactivé."
-    : "La connexion a échoué" + (err.code ? " (" + err.code + ")" : "") + (err.message ? " — " + err.message : "") + ", réessaie plus tard.";
+    : err.code === "auth/adopt-failed" ? "Ce compte Google est déjà relié à une autre progression, et la bascule automatique dessus a échoué (" + (err.detail || "raison inconnue") + ")."
+    : "La connexion a échoué" + (err.code ? " (" + err.code + ")" : "") + ", réessaie plus tard.";
 }
 
 function googleFailDialog(label) {
