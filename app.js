@@ -4115,22 +4115,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.body.insertAdjacentHTML("afterbegin", MANGA.DEFS_SVG);
   boot();
 
-  /* Crédit de jetons pour tester la boutique sans jouer des dizaines de
-     matchs : visiter une fois l'adresse avec ?jetons=<nombre> (profil
-     actif requis). Purement local, aucune valeur réelle. Retiré de
-     l'URL aussitôt après pour ne pas recréditer à chaque rechargement
-     de la page si elle reste dans l'historique/en favori. */
-  const jetonsParam = new URLSearchParams(location.search).get("jetons");
-  if (jetonsParam && PROFILE.active() && typeof DUEL !== "undefined") {
-    const n = parseInt(jetonsParam, 10);
-    if (n > 0) {
-      DUEL.addTokens(n);
-      const url = new URL(location.href);
-      url.searchParams.delete("jetons");
-      history.replaceState(null, "", url);
-    }
-  }
-
   /* Les boîtes de dialogue natives (confirm) sont bloquées dans une page
      embarquée : elles renvoient false sans rien afficher, et le bouton
      paraît mort. On passe donc par la modale du jeu, qui marche partout. */
