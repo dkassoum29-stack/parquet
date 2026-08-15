@@ -1721,8 +1721,12 @@ DUEL.recordResult = function (won, tie, cb, tokenRates) {
         title: DUEL.getEquipped("title"),
       };
     }, (error, committed, snapshot) => {
-      cb && cb();
-      if (error || !committed) return;
+      /* err passé à cb pour affichage direct dans l'UI — trop
+         d'échecs silencieux jusqu'ici (impossibles à diagnostiquer
+         sans accès à la console du joueur). */
+      if (error) { console.error("recordResult (transaction) :", error); cb && cb(error); return; }
+      if (!committed) { console.warn("recordResult : transaction non validée (abandonnée)"); cb && cb(new Error("transaction non validée")); return; }
+      cb && cb(null);
       const final = snapshot ? snapshot.val() : null;
       if (!final) return;
       /* firebase.database.ServerValue.TIMESTAMP (le sentinel horodatage
@@ -1747,6 +1751,11 @@ DUEL.recordResult = function (won, tie, cb, tokenRates) {
       if (DUEL.rankInfo(ratingBefore).label !== DUEL.rankInfo(final.rating).label) earned += 50;
       DUEL.addTokens(earned);
     });
+  }, (authErr) => {
+    /* si l'auth échoue (réseau, etc.), cb ne partait jamais avant —
+       silence total, aucun moyen de savoir pourquoi rien ne s'écrivait. */
+    console.error("recordResult (auth) :", authErr);
+    cb && cb(authErr);
   });
 };
 

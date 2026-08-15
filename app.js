@@ -3819,7 +3819,12 @@ function duelShowResult() {
   duelCheckPerfectBadge(won);
 
   if (DUEL_UI.mode === "ai") {
-    DUEL.recordSeasonResult(won, tie);
+    /* si l'écriture échoue, on le dit clairement au lieu de laisser le
+       joueur croire que la Saison continue normalement pendant que le
+       classement ne bouge jamais en silence. */
+    DUEL.recordSeasonResult(won, tie, (err) => {
+      if (err) infoDialog("Classement", "Match non comptabilisé", "La mise à jour du classement a échoué (" + (err.code || err.message || "erreur réseau") + "). Réessaie un match, ou vérifie ta connexion.");
+    });
     const onDone = DUEL_UI.aiOnDone;
     duelReset();
     if (onDone) onDone(won, tie, myScore, oppScore);
@@ -3860,14 +3865,15 @@ function duelShowResult() {
   shell.appendChild(home);
 
   let settled = false;
-  const ready = () => {
+  const ready = (err) => {
     if (settled) return;
     settled = true;
     again.disabled = false; home.disabled = false;
-    waitNote.remove();
+    waitNote.textContent = err ? "Classement non mis à jour (" + (err.code || err.message || "erreur réseau") + ")." : "";
+    if (!err) waitNote.remove();
   };
   DUEL.recordResult(won, tie, ready);
-  setTimeout(ready, 4000);
+  setTimeout(() => ready(settled ? undefined : new Error("délai dépassé")), 4000);
 }
 
 /* ═══════════════ MODE SAISON ═══════════════
