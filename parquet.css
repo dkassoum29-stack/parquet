@@ -867,6 +867,20 @@ button { font: inherit; color: inherit; }
   font-variant-numeric: tabular-nums; font-weight: 600;
 }
 
+/* variante interactive (profil multijoueur, isMine) : une colonne de
+   plus pour le bouton d'ajout de point — .attr seul reste inchangé
+   pour la carrière solo, qui n'a pas ce bouton. */
+.attr.attr-editable { grid-template-columns: 1fr 52px 24px 26px; }
+.attr-plus {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--accent); font-weight: 700; font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.attr-plus:disabled { opacity: .3; cursor: default; }
+.attr-plus:not(:disabled):hover { border-color: var(--accent); }
+
 /* ─────────── badges ─────────── */
 
 .badges-grid {

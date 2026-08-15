@@ -1702,37 +1702,37 @@ DUEL.awardBadge = function (character, id, label) {
    Contrairement à la carrière solo (ENG.progress, cycle annuel avec
    déclin lié à l'âge — jamais touché depuis ici, voir note en tête de
    fichier), une progression simple et directe : quelques points
-   d'attributs distribués après chaque match compté (tout ce qui passe
-   par DUEL.recordResult, donc Ami/Aléatoire ET Saison), pondérés par
-   poste (DATA.POS_WEIGHTS — un meneur progresse plus souvent en passe/
-   dribble qu'en rebond), plafonnés par le potentiel tiré à la création
-   (p.potential, même champ que la carrière solo — ENG.newPlayer le
-   fixe déjà pour tout personnage multijoueur via DUEL.quickAvatar,
-   simplement jamais exploité jusqu'ici). Pèse vraiment sur les
-   matchs : DUEL.resolveChoice déplace la probabilité de réussite
-   d'environ 0.8 point par point d'attribut, donc quelques victoires
-   se ressentent en jeu, pas juste sur le papier. */
+   d'attribut crédités après chaque match compté (tout ce qui passe par
+   DUEL.recordResult, donc Ami/Aléatoire ET Saison), mis de côté dans
+   une réserve (c.attrPoints) plutôt qu'appliqués automatiquement — le
+   joueur choisit lui-même où les mettre (DUEL.spendAttrPoint, écran
+   « profil complet » dans app.js). Plafonnés par le potentiel tiré à
+   la création (p.potential, même champ que la carrière solo —
+   ENG.newPlayer le fixe déjà pour tout personnage multijoueur via
+   DUEL.quickAvatar, simplement jamais exploité jusqu'ici). Pèse
+   vraiment sur les matchs : DUEL.resolveChoice déplace la probabilité
+   de réussite d'environ 0.8 point par point d'attribut, donc quelques
+   victoires bien réparties se ressentent en jeu, pas juste sur le
+   papier. */
 DUEL.MP_GROWTH = { win: 3, tie: 1, loss: 0 };
 
-DUEL.growCharacter = function (c, won, tie) {
-  if (!c || !c.attrs) return null;
-  const pool = won ? DUEL.MP_GROWTH.win : tie ? DUEL.MP_GROWTH.tie : DUEL.MP_GROWTH.loss;
-  if (pool <= 0) return null;
+DUEL.addAttrPoints = function (c, n) {
+  if (!c || !(n > 0)) return;
+  c.attrPoints = (c.attrPoints || 0) + n;
+};
+
+/* Dépense un point de la réserve sur un attribut précis, choisi par le
+   joueur — plafonné au potentiel comme la répartition automatique
+   l'était. Sauvegarde le personnage elle-même (appelée directement
+   depuis un clic, pas depuis DUEL.recordResult). */
+DUEL.spendAttrPoint = function (c, attrId) {
+  if (!c || !c.attrs || !(c.attrPoints > 0)) return false;
   const cap = ENG.clamp(c.potential || 75, 30, 99);
-  const weights = DATA.POS_WEIGHTS[c.position] || {};
-  const gained = {};
-  for (let i = 0; i < pool; i++) {
-    const pickable = Object.keys(weights).filter((k) => (c.attrs[k] || 0) < cap);
-    if (!pickable.length) break;
-    let total = 0;
-    pickable.forEach((k) => { total += weights[k] || 0.1; });
-    let r = Math.random() * total;
-    let chosen = pickable[0];
-    for (const k of pickable) { r -= (weights[k] || 0.1); if (r <= 0) { chosen = k; break; } }
-    c.attrs[chosen] = Math.min(cap, (c.attrs[chosen] || 0) + 1);
-    gained[chosen] = (gained[chosen] || 0) + 1;
-  }
-  return Object.keys(gained).length ? gained : null;
+  if ((c.attrs[attrId] || 0) >= cap) return false;
+  c.attrs[attrId] = Math.min(cap, (c.attrs[attrId] || 0) + 1);
+  c.attrPoints -= 1;
+  DUEL.setCharacter(c);
+  return true;
 };
 
 DUEL.recordResult = function (won, tie, cb, tokenRates) {
@@ -1780,15 +1780,16 @@ DUEL.recordResult = function (won, tie, cb, tokenRates) {
          via DUEL.signatureUsesForCharacter — voir plus bas. */
       let badgeGained = false;
       if (final.wins >= 10 && c && DUEL.awardBadge(c, "wins10", "10 victoires")) badgeGained = true;
-      const growth = c ? DUEL.growCharacter(c, won, tie) : null;
-      if (c && (badgeGained || growth)) DUEL.setCharacter(c);
+      const pointsEarned = won ? DUEL.MP_GROWTH.win : tie ? DUEL.MP_GROWTH.tie : DUEL.MP_GROWTH.loss;
+      if (c && pointsEarned > 0) DUEL.addAttrPoints(c, pointsEarned);
+      if (c && (badgeGained || pointsEarned > 0)) DUEL.setCharacter(c);
       /* Jetons de boutique : un peu à chaque match, un bonus si le
          palier de rang change (façon Rep NBA 2K qui récompense la
          montée de niveau). */
       let earned = tie ? rates.tie : (won ? rates.win : rates.loss);
       if (DUEL.rankInfo(ratingBefore).label !== DUEL.rankInfo(final.rating).label) earned += 50;
       DUEL.addTokens(earned);
-      cb && cb(null, growth);
+      cb && cb(null, pointsEarned > 0 ? pointsEarned : null);
     });
   }, (authErr) => {
     /* si l'auth échoue (réseau, etc.), cb ne partait jamais avant —

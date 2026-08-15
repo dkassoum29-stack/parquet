@@ -3222,18 +3222,29 @@ function duelOpenProfile(profile, attrsSource, backFn, isMine) {
   if (attrsSource && attrsSource.number != null) bio.push("#" + attrsSource.number);
   box.appendChild(duelBuildHeroCard(profile.name, bio.filter(Boolean).join(" · "), profile.ovr, profile, true, !!isMine));
 
-  /* ─── répartition d'attributs (dispo pour moi-même et un adversaire en salon) ─── */
+  /* ─── répartition d'attributs (dispo pour moi-même et un adversaire en salon) ───
+     Sur mon propre personnage (isMine), c'est interactif : les points
+     gagnés en match (DUEL.recordResult) atterrissent dans une réserve
+     (attrsSource.attrPoints) que je répartis moi-même ici, au lieu
+     d'une distribution automatique — un bouton + par attribut, plafonné
+     au potentiel du personnage comme avant. */
   const attrs = attrsSource && attrsSource.attrs;
   if (attrs) {
+    const cap = ENG.clamp((attrsSource && attrsSource.potential) || 75, 30, 99);
+    const pool = isMine ? (attrsSource.attrPoints || 0) : 0;
     const attrsCard = el("div", "card duel-mode-card");
-    attrsCard.appendChild(el("div", "card-title", "Attributs"));
+    const attrsHead = el("div", "profiles-head");
+    attrsHead.appendChild(el("div", "card-title", "Attributs"));
+    if (isMine) attrsHead.appendChild(el("div", "duel-msg", pool > 0 ? pool + " point" + (pool > 1 ? "s" : "") + " à répartir" : "Aucun point à répartir pour l'instant"));
+    attrsCard.appendChild(attrsHead);
     const attrsBody = el("div", "attrs-body");
+    const refresh = () => DUEL.getMyProfile((p) => duelOpenProfile(p, DUEL.getCharacter(), backFn, true));
     DATA.ATTR_GROUPS.forEach((g) => {
       const sect = el("div");
       sect.appendChild(el("div", "attr-group-name", g.label));
       DATA.ATTRS.filter((a) => a.g === g.id).forEach((a) => {
         const v = Math.round(attrs[a.id] || 0);
-        const attrRow = el("div", "attr");
+        const attrRow = el("div", "attr" + (isMine ? " attr-editable" : ""));
         attrRow.appendChild(el("span", "attr-n", a.label));
         const bar = el("span", "attr-bar");
         const fill = el("i", tierClass(v));
@@ -3241,6 +3252,15 @@ function duelOpenProfile(profile, attrsSource, backFn, isMine) {
         bar.appendChild(fill);
         attrRow.appendChild(bar);
         attrRow.appendChild(el("span", "attr-v", v));
+        if (isMine) {
+          const atCap = v >= cap;
+          const plus = el("button", "btn-icon attr-plus", "+");
+          plus.disabled = pool <= 0 || atCap;
+          plus.title = atCap ? "Potentiel atteint pour cet attribut" : "Ajouter un point";
+          plus.setAttribute("aria-label", "Ajouter un point en " + a.label);
+          plus.onclick = () => { if (DUEL.spendAttrPoint(attrsSource, a.id)) refresh(); };
+          attrRow.appendChild(plus);
+        }
         sect.appendChild(attrRow);
       });
       attrsBody.appendChild(sect);
@@ -3813,15 +3833,12 @@ function duelCheckPerfectBadge(won) {
   if (c && DUEL.awardBadge(c, "perfect", "Sans-faute")) DUEL.setCharacter(c);
 }
 
-/* "+2 Tir, +1 Défense périmètre" — traduit l'objet {attrId: points}
-   renvoyé par DUEL.growCharacter en texte lisible. */
-function duelGrowthText(growth) {
-  if (!growth) return "";
-  const parts = Object.keys(growth).map((k) => {
-    const a = DATA.ATTRS.find((x) => x.id === k);
-    return "+" + growth[k] + " " + (a ? a.label : k);
-  });
-  return parts.join(", ");
+/* pointsEarned : nombre de points d'attribut crédités à la réserve
+   (DUEL.recordResult) — le joueur les répartit lui-même ensuite, voir
+   la carte Attributs du profil complet (isMine). */
+function duelGrowthText(pointsEarned) {
+  if (!pointsEarned) return "";
+  return pointsEarned + " point" + (pointsEarned > 1 ? "s" : "") + " d'attribut à répartir";
 }
 
 function duelShowResult() {
