@@ -863,10 +863,13 @@ DUEL.googleLinkedInfo = function () {
 DUEL._adoptExistingCredential = function (e, sentCredential, cb) {
   if (e.code !== "auth/credential-already-in-use") { cb(e); return; }
   const cred = e.credential || sentCredential;
-  if (!cred) { cb(e); return; }
+  if (!cred) { console.error("Adoption Google : ni e.credential ni le credential envoyé ne sont disponibles.", e); cb(e); return; }
   firebase.auth().signInWithCredential(cred)
     .then((result) => { DUEL.uid = result.user.uid; cb(null, { email: result.user.email, name: result.user.displayName, switched: true }); })
-    .catch((e2) => cb(e2));
+    .catch((e2) => {
+      console.error("Adoption Google (signInWithCredential) a échoué :", e2);
+      cb({ code: e2.code || "auth/adopt-failed", message: "adoption échouée" + (e2.message ? " : " + e2.message : "") });
+    });
 };
 
 /* Google Identity Services (accounts.google.com/gsi/client), chargé à
