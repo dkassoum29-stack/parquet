@@ -2460,6 +2460,17 @@ function openAccountMenu(onDone) {
     DUEL.loadGoogleIdentity();
     choices.push({ h: "Se connecter avec Google", d: "Retrouve ta carrière et ton personnage multijoueur sur un autre appareil, même si tu l'as déjà relié ailleurs.", t: "",
       pick: () => { setActionEnabled(true); doLinkGoogle(onDone); } });
+  } else {
+    choices.push({ h: "Se déconnecter", d: "Retire le lien Google de cet appareil — utile pour tester avec un autre compte. Ta progression locale reste intacte.", t: "",
+      pick: () => {
+        setActionEnabled(true);
+        DUEL.signOutGoogle(() => {
+          PROFILE.forgetGoogleLinked();
+          paintBrandCorner();
+          infoDialog("Compte Google", "Déconnecté", "Tu peux maintenant relier un autre compte Google. Ta progression locale n'a pas bougé.");
+          onDone && onDone();
+        });
+      } });
   }
   ask({
     kicker: "Compte",

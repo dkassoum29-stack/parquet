@@ -861,6 +861,20 @@ DUEL.googleLinkedInfo = function () {
   return g ? { email: g.email, name: g.displayName } : null;
 };
 
+/* Retire le lien Google de cet appareil (utile pour tester avec un
+   autre compte, ou repartir à zéro) — ne touche jamais aux profils
+   locaux ni à la progression, qui restent sur l'appareil comme avant
+   tout lien. Une fois déconnecté, on rouvre tout de suite une session
+   anonyme fraîche pour que le monde multijoueur continue de fonctionner
+   normalement (classement, salons…), simplement plus reliée à personne. */
+DUEL.signOutGoogle = function (cb) {
+  if (!DUEL.ready() || typeof firebase === "undefined" || !firebase.apps || !firebase.apps.length) { cb && cb(); return; }
+  firebase.auth().signOut().then(() => {
+    DUEL.uid = null;
+    DUEL.ensureAuth(() => cb && cb(), () => cb && cb());
+  }).catch(() => cb && cb());
+};
+
 /* Ce compte Google est déjà relié à un autre uid Firebase — un autre
    appareil, ou une session anonyme antérieure sur celui-ci — donc le
    lien échoue avec credential-already-in-use. Plutôt que de laisser

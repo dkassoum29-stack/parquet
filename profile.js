@@ -138,6 +138,9 @@ PROFILE.CLOUD_FLAG = "parquet_google_linked";
 PROFILE.rememberGoogleLinked = function () {
   try { localStorage.setItem(PROFILE.CLOUD_FLAG, "1"); } catch (e) {}
 };
+PROFILE.forgetGoogleLinked = function () {
+  try { localStorage.removeItem(PROFILE.CLOUD_FLAG); } catch (e) {}
+};
 PROFILE.wasGoogleLinked = function () {
   try { return localStorage.getItem(PROFILE.CLOUD_FLAG) === "1"; } catch (e) { return false; }
 };
