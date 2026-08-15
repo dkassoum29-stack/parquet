@@ -122,6 +122,34 @@ Realtime Database (**pas Firestore**), projet `parquet-duel`. Nœuds :
   carrière solo par uid, voir section Compte Google) : **règles toutes
   publiées** par l'utilisateur (2026-08-12).
 
+  **`DUEL.playerKey`** (2026-08-15, voir section Architecture du
+  multijoueur) : le classement/rang/pseudo/amis/défis sont désormais
+  identifiés par `uid__idProfil` (composite) plutôt que par le seul
+  `uid`, pour que chaque profil local ait sa propre carrière
+  multijoueur. **`parquet_names`/`parquet_friends`/`parquet_challenges`
+  ont une règle d'écriture ouverte (`auth != null`)**, donc pas
+  affectées par ce changement. `parquet_leaderboard` en revanche avait
+  `.write: "auth.uid === $uid"` sous `$uid` — comparait l'uid réel à la
+  clé composite entière, donc refusait tout le temps
+  (`permission_denied`, symptôme réel : plus aucune écriture dans ce
+  nœud après un match, cote/V-N-D jamais mises à jour). Règle corrigée
+  le 2026-08-15 : `$key === auth.uid || $key.beginsWith(auth.uid + '__')`.
+  Bug repéré tardivement — d'abord pris pour un simple problème de
+  timing d'affichage (corrigé en attendant la confirmation d'écriture
+  avant de permettre de quitter l'écran de résultat), puis pour une
+  perte de mise à jour en enchaînant plusieurs matchs vite (corrigé en
+  passant d'un get()+set() séparés à une vraie transaction Firebase) —
+  ces deux corrections restent de bonnes améliorations en soi, mais ni
+  l'une ni l'autre n'était la cause du symptôme observé par
+  l'utilisateur ; seul le retour d'erreur explicite dans l'UI
+  (`recordResult` transmet maintenant l'erreur réelle à son callback
+  au lieu de l'avaler) a permis de voir `permission_denied` et de
+  remonter à la vraie cause. `parquet_mp_characters` (personnage
+  multijoueur, jetons, cosmétiques — voir section Architecture du
+  multijoueur) n'a pas de règles publiées du tout pour l'instant : à
+  faire si le classement continue de fonctionner mais que la synchro
+  cross-device du personnage échoue silencieusement de la même façon.
+
 ## Workflow attendu
 
 - Ne jamais commit sans demande explicite.

@@ -3813,6 +3813,17 @@ function duelCheckPerfectBadge(won) {
   if (c && DUEL.awardBadge(c, "perfect", "Sans-faute")) DUEL.setCharacter(c);
 }
 
+/* "+2 Tir, +1 Défense périmètre" — traduit l'objet {attrId: points}
+   renvoyé par DUEL.growCharacter en texte lisible. */
+function duelGrowthText(growth) {
+  if (!growth) return "";
+  const parts = Object.keys(growth).map((k) => {
+    const a = DATA.ATTRS.find((x) => x.id === k);
+    return "+" + growth[k] + " " + (a ? a.label : k);
+  });
+  return parts.join(", ");
+}
+
 function duelShowResult() {
   const myScore = (DUEL_UI.myProgress && DUEL_UI.myProgress.score) || 0;
   const oppScore = (DUEL_UI.oppProgress && DUEL_UI.oppProgress.score) || 0;
@@ -3823,8 +3834,10 @@ function duelShowResult() {
     /* si l'écriture échoue, on le dit clairement au lieu de laisser le
        joueur croire que la Saison continue normalement pendant que le
        classement ne bouge jamais en silence. */
-    DUEL.recordSeasonResult(won, tie, (err) => {
-      if (err) infoDialog("Classement", "Match non comptabilisé", "La mise à jour du classement a échoué (" + (err.code || err.message || "erreur réseau") + "). Réessaie un match, ou vérifie ta connexion.");
+    DUEL.recordSeasonResult(won, tie, (err, growth) => {
+      if (err) { infoDialog("Classement", "Match non comptabilisé", "La mise à jour du classement a échoué (" + (err.code || err.message || "erreur réseau") + "). Réessaie un match, ou vérifie ta connexion."); return; }
+      const gText = duelGrowthText(growth);
+      if (gText) infoDialog("Progression", won ? "Victoire !" : tie ? "Match nul" : "Défaite", "Ton joueur progresse : " + gText + ".");
     });
     const onDone = DUEL_UI.aiOnDone;
     duelReset();
@@ -3866,12 +3879,14 @@ function duelShowResult() {
   shell.appendChild(home);
 
   let settled = false;
-  const ready = (err) => {
+  const ready = (err, growth) => {
     if (settled) return;
     settled = true;
     again.disabled = false; home.disabled = false;
-    waitNote.textContent = err ? "Classement non mis à jour (" + (err.code || err.message || "erreur réseau") + ")." : "";
-    if (!err) waitNote.remove();
+    const gText = duelGrowthText(growth);
+    waitNote.textContent = err ? "Classement non mis à jour (" + (err.code || err.message || "erreur réseau") + ")."
+      : gText ? "Progression : " + gText : "";
+    if (!err && !gText) waitNote.remove();
   };
   DUEL.recordResult(won, tie, ready);
   setTimeout(() => ready(settled ? undefined : new Error("délai dépassé")), 4000);

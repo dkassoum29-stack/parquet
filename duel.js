@@ -1697,6 +1697,44 @@ DUEL.awardBadge = function (character, id, label) {
    avec des chiffres partis de données déjà périmées — une victoire
    entière disparaissait silencieusement du classement (constaté en
    usage réel : les stats ne montaient plus après un match de Saison). */
+
+/* ═══════════════ progression du personnage multijoueur ═══════════════
+   Contrairement à la carrière solo (ENG.progress, cycle annuel avec
+   déclin lié à l'âge — jamais touché depuis ici, voir note en tête de
+   fichier), une progression simple et directe : quelques points
+   d'attributs distribués après chaque match compté (tout ce qui passe
+   par DUEL.recordResult, donc Ami/Aléatoire ET Saison), pondérés par
+   poste (DATA.POS_WEIGHTS — un meneur progresse plus souvent en passe/
+   dribble qu'en rebond), plafonnés par le potentiel tiré à la création
+   (p.potential, même champ que la carrière solo — ENG.newPlayer le
+   fixe déjà pour tout personnage multijoueur via DUEL.quickAvatar,
+   simplement jamais exploité jusqu'ici). Pèse vraiment sur les
+   matchs : DUEL.resolveChoice déplace la probabilité de réussite
+   d'environ 0.8 point par point d'attribut, donc quelques victoires
+   se ressentent en jeu, pas juste sur le papier. */
+DUEL.MP_GROWTH = { win: 3, tie: 1, loss: 0 };
+
+DUEL.growCharacter = function (c, won, tie) {
+  if (!c || !c.attrs) return null;
+  const pool = won ? DUEL.MP_GROWTH.win : tie ? DUEL.MP_GROWTH.tie : DUEL.MP_GROWTH.loss;
+  if (pool <= 0) return null;
+  const cap = ENG.clamp(c.potential || 75, 30, 99);
+  const weights = DATA.POS_WEIGHTS[c.position] || {};
+  const gained = {};
+  for (let i = 0; i < pool; i++) {
+    const pickable = Object.keys(weights).filter((k) => (c.attrs[k] || 0) < cap);
+    if (!pickable.length) break;
+    let total = 0;
+    pickable.forEach((k) => { total += weights[k] || 0.1; });
+    let r = Math.random() * total;
+    let chosen = pickable[0];
+    for (const k of pickable) { r -= (weights[k] || 0.1); if (r <= 0) { chosen = k; break; } }
+    c.attrs[chosen] = Math.min(cap, (c.attrs[chosen] || 0) + 1);
+    gained[chosen] = (gained[chosen] || 0) + 1;
+  }
+  return Object.keys(gained).length ? gained : null;
+};
+
 DUEL.recordResult = function (won, tie, cb, tokenRates) {
   const rates = tokenRates || { win: 20, tie: 5, loss: 5 };
   DUEL.ensureAuth((uid) => {
@@ -1726,9 +1764,8 @@ DUEL.recordResult = function (won, tie, cb, tokenRates) {
          sans accès à la console du joueur). */
       if (error) { console.error("recordResult (transaction) :", error); cb && cb(error); return; }
       if (!committed) { console.warn("recordResult : transaction non validée (abandonnée)"); cb && cb(new Error("transaction non validée")); return; }
-      cb && cb(null);
       const final = snapshot ? snapshot.val() : null;
-      if (!final) return;
+      if (!final) { cb && cb(null); return; }
       /* firebase.database.ServerValue.TIMESTAMP (le sentinel horodatage
          serveur) n'est pas fiable À L'INTÉRIEUR d'une transaction — le
          SDK doit pouvoir recalculer/comparer la valeur localement pour
@@ -1741,15 +1778,17 @@ DUEL.recordResult = function (won, tie, cb, tokenRates) {
       /* Toujours attribué (même palier bronze) : c'est ce badge, pas
          le palier affiché plus haut, qui débloque le coup signature
          via DUEL.signatureUsesForCharacter — voir plus bas. */
-      if (final.wins >= 10) {
-        if (c && DUEL.awardBadge(c, "wins10", "10 victoires")) DUEL.setCharacter(c);
-      }
+      let badgeGained = false;
+      if (final.wins >= 10 && c && DUEL.awardBadge(c, "wins10", "10 victoires")) badgeGained = true;
+      const growth = c ? DUEL.growCharacter(c, won, tie) : null;
+      if (c && (badgeGained || growth)) DUEL.setCharacter(c);
       /* Jetons de boutique : un peu à chaque match, un bonus si le
          palier de rang change (façon Rep NBA 2K qui récompense la
          montée de niveau). */
       let earned = tie ? rates.tie : (won ? rates.win : rates.loss);
       if (DUEL.rankInfo(ratingBefore).label !== DUEL.rankInfo(final.rating).label) earned += 50;
       DUEL.addTokens(earned);
+      cb && cb(null, growth);
     });
   }, (authErr) => {
     /* si l'auth échoue (réseau, etc.), cb ne partait jamais avant —
