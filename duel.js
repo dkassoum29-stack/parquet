@@ -125,7 +125,7 @@ D_({ id: "post_up", w: 2,
     { h: "Ressortir le ballon", d: "Relancer le jeu.", t: "Prudent", mech: "pass" },
   ] });
 
-D_({ id: "fastbreak", w: 2,
+D_({ id: "fastbreak", w: 2, three: true,
   head: "Contre-attaque",
   body: "Le ballon récupéré, c'est la course. Un seul défenseur recule, entre toi et le cercle.",
   ch: [
@@ -143,7 +143,7 @@ D_({ id: "pick_and_roll", w: 2,
     { h: "Trouver le relais", d: "Chercher le partenaire à l'écran.", t: "Lecture de jeu", mech: "pass" },
   ] });
 
-D_({ id: "corner_three", w: 2,
+D_({ id: "corner_three", w: 2, three: true,
   head: "Sortie de corner",
   body: "Le ballon arrive dans le corner, la défense ferme la course en catastrophe.",
   ch: [
@@ -152,7 +152,7 @@ D_({ id: "corner_three", w: 2,
     { h: "Rejouer le ballon", d: "Chercher mieux.", t: "Patient", mech: "pass" },
   ] });
 
-D_({ id: "clutch_iso", w: 2, clutchWeighted: true,
+D_({ id: "clutch_iso", w: 2, clutchWeighted: true, three: true,
   head: "Money-time",
   body: "Le chrono défile. Ça compte double dans la tête, même si le match continue.",
   ch: [
@@ -161,7 +161,7 @@ D_({ id: "clutch_iso", w: 2, clutchWeighted: true,
     { h: "Décaler un partenaire", d: "Faire confiance au collectif.", t: "Partagé", mech: "pass" },
   ] });
 
-D_({ id: "steal_and_go", w: 2, flavor: "defense",
+D_({ id: "steal_and_go", w: 2, flavor: "defense", three: true,
   head: "Interception surprise",
   body: "Tu lis la passe avant tout le monde, le ballon est à toi. Devant toi, le terrain est grand ouvert.",
   ch: [
@@ -186,6 +186,7 @@ D_({ id: "pg_dime", w: 2, positions: ["PG"],
     { h: "Décaler pour le tir", d: "Trouver le tireur ouvert.", t: "Vision de jeu", mech: "pass" },
     { h: "Prendre le tir toi-même", d: "Assumer la fin de possession.", t: "Direct", mech: "shoot" },
     { h: "Pénétrer et créer le contact", d: "Forcer la décision arbitrale.", t: "Engagé", mech: "drive" },
+    { h: "Foncer et provoquer la faute", d: "Chercher le contact plutôt que le geste.", t: "Aux lancers", mech: "line" },
   ] });
 
 D_({ id: "sg_catch_shoot", w: 2, positions: ["SG"],
@@ -195,6 +196,7 @@ D_({ id: "sg_catch_shoot", w: 2, positions: ["SG"],
     { h: "Tir en catch-and-shoot", d: "Le rythme est parfait.", t: "Précis", mech: "shoot" },
     { h: "Enchaîner vers le cercle", d: "La défense est en retard.", t: "Opportuniste", mech: "drive" },
     { h: "Ressortir la balle", d: "Ne pas forcer.", t: "Patient", mech: "pass" },
+    { h: "Attaquer le close-out fermé trop vite", d: "Provoquer la faute sur la fermeture.", t: "Aux lancers", mech: "line" },
   ] });
 
 D_({ id: "sf_two_way", w: 2, positions: ["SF"],
@@ -204,9 +206,10 @@ D_({ id: "sf_two_way", w: 2, positions: ["SF"],
     { h: "Isolation rapide", d: "Jouer en un contre un.", t: "Polyvalent", mech: "drive" },
     { h: "Tir à mi-distance", d: "Un classique du poste.", t: "Fiable", mech: "shoot" },
     { h: "Trouver l'intérieur", d: "Servir le pivot démarqué.", t: "Altruiste", mech: "pass" },
+    { h: "Attaquer et chercher le contact", d: "Une option de plus à ce poste polyvalent.", t: "Aux lancers", mech: "line" },
   ] });
 
-D_({ id: "pf_stretch", w: 2, positions: ["PF"],
+D_({ id: "pf_stretch", w: 2, positions: ["PF"], three: true,
   head: "Écartement à la lucarne",
   body: "Tu t'écartes en position d'ailier fort moderne, l'espace se crée derrière l'arc.",
   ch: [
@@ -222,6 +225,7 @@ D_({ id: "c_paint_duel", w: 2, positions: ["C"],
     { h: "Mouvement de pivot", d: "La technique avant la force.", t: "Technique", mech: "shoot" },
     { h: "Forcer en puissance", d: "Imposer le rapport de force.", t: "Physique", mech: "drive" },
     { h: "Ressortir au shooteur", d: "Créer pour l'extérieur.", t: "Altruiste", mech: "pass" },
+    { h: "Écraser la position sous le cercle", d: "Gagner d'abord la bataille du terrain.", t: "Domination", mech: "post" },
   ] });
 
 /* ── situations universelles supplémentaires ── */
@@ -307,7 +311,7 @@ D_({ id: "double_team_break", w: 1,
     { h: "Trouver le joueur libre", d: "Un partenaire est forcément démarqué.", t: "Lecture obligatoire", mech: "pass" },
   ] });
 
-D_({ id: "transition_trail", w: 2,
+D_({ id: "transition_trail", w: 2, three: true,
   head: "Retard en transition",
   body: "Tu arrives en deuxième vague sur la contre-attaque, le ballon peut encore te trouver derrière l'arc.",
   ch: [
@@ -327,7 +331,7 @@ D_({ id: "charge_take", w: 1, flavor: "defense",
     { h: "Relancer le jeu", d: "Poser l'attaque.", t: "Posé", mech: "pass" },
   ] });
 
-D_({ id: "help_rotation", w: 2, flavor: "defense",
+D_({ id: "help_rotation", w: 2, flavor: "defense", three: true,
   head: "Rotation défensive",
   body: "Tu quittes ton vis-à-vis pour aider sur la pénétration adverse — l'interception réussit, et te voilà lancé.",
   ch: [
@@ -363,6 +367,7 @@ D_({ id: "pg_full_court", w: 2, positions: ["PG"],
     { h: "Accélérer et attaquer", d: "Casser le pressing par la vitesse.", t: "Direct", mech: "drive" },
     { h: "Chercher le tir rapide", d: "Profiter de la surprise.", t: "Audacieux", mech: "shoot" },
     { h: "Passer le pressing en relançant", d: "La sécurité avant tout.", t: "Prudent", mech: "pass" },
+    { h: "Accélérer et chercher le contact", d: "Provoquer la faute sur le pressing.", t: "Aux lancers", mech: "line" },
   ] });
 
 D_({ id: "pg_pick_reject", w: 2, positions: ["PG"],
@@ -408,6 +413,7 @@ D_({ id: "sf_post_mismatch", w: 2, positions: ["SF"],
     { h: "Jouer la puissance", d: "Imposer le rapport de force.", t: "Physique", mech: "drive" },
     { h: "Tir en pivotant", d: "Un geste travaillé.", t: "Technique", mech: "shoot" },
     { h: "Ressortir si ça se referme", d: "Rester patient.", t: "Prudent", mech: "pass" },
+    { h: "Écraser le poste sur plusieurs dribbles", d: "Prendre le temps d'imposer sa taille.", t: "Domination", mech: "post" },
   ] });
 
 D_({ id: "pf_roll_man", w: 2, positions: ["PF"],
@@ -417,6 +423,7 @@ D_({ id: "pf_roll_man", w: 2, positions: ["PF"],
     { h: "Foncer recevoir au cercle", d: "Profiter de l'espace créé.", t: "Direct", mech: "drive" },
     { h: "Se réétaler pour le tir", d: "L'option pop plutôt que roll.", t: "Moderne", mech: "shoot" },
     { h: "Laisser le jeu se faire ailleurs", d: "Rester discipliné.", t: "Discipline", mech: "pass" },
+    { h: "Se battre pour la position et le rebond", d: "Rester actif si la passe ne vient pas.", t: "Présence", mech: "post" },
   ] });
 
 D_({ id: "pf_offensive_board", w: 2, positions: ["PF"],
@@ -426,6 +433,7 @@ D_({ id: "pf_offensive_board", w: 2, positions: ["PF"],
     { h: "Remettre directement", d: "Suivre son instinct.", t: "Immédiat", mech: "drive" },
     { h: "Ressortir pour un tir propre", d: "Recomposer l'action.", t: "Technique", mech: "shoot" },
     { h: "Redistribuer vers l'extérieur", d: "Reposer le jeu.", t: "Collectif", mech: "pass" },
+    { h: "Se battre à deux mains pour la balle", d: "Imposer le rapport de force sous le cercle.", t: "Domination", mech: "post" },
   ] });
 
 D_({ id: "c_lob_finish", w: 2, positions: ["C"],
@@ -542,13 +550,14 @@ D_({ id: "pg_hesitation", w: 2, positions: ["PG"],
     { h: "Redistribuer le jeu", d: "Utiliser l'attention qu'il te porte.", t: "Vision de jeu", mech: "pass" },
   ] });
 
-D_({ id: "sg_flare_three", w: 2, positions: ["SG"],
+D_({ id: "sg_flare_three", w: 2, positions: ["SG"], three: true,
   head: "Trois points sur écran flare",
   body: "Le ballon change de côté, un écran flare te libère juste à temps pour une ligne de tir dégagée.",
   ch: [
     { h: "Tir à trois points", d: "La fenêtre classique du poste.", t: "Spécialiste", mech: "shoot" },
     { h: "Enchaîner vers l'intérieur", d: "Si le défenseur ferme trop vite.", t: "Opportuniste", mech: "drive" },
     { h: "Ressortir la balle", d: "Chercher mieux.", t: "Patient", mech: "pass" },
+    { h: "Couper vers le panier pour la faute", d: "Le défenseur s'accroche encore à l'écran.", t: "Aux lancers", mech: "line" },
   ] });
 
 D_({ id: "sf_euro_step", w: 2, positions: ["SF"],
@@ -576,14 +585,30 @@ D_({ id: "c_deep_seal", w: 2, positions: ["C"],
     { h: "Forcer en puissance", d: "La position est gagnée.", t: "Physique", mech: "drive" },
     { h: "Petit tir au cercle", d: "Un geste économe.", t: "Technique", mech: "shoot" },
     { h: "Ressortir si ça se complique", d: "Rejouer le ballon.", t: "Prudent", mech: "pass" },
+    { h: "Tenir le sceau et rappeler le ballon", d: "La position est gagnée, il suffit de la garder.", t: "Présence", mech: "post" },
   ] });
 
 /* Pool filtré par poste : les situations universelles restent tirables
    par tout le monde, celles taguées `positions` sont réservées au(x)
    poste(s) listé(s) — évite que tout le monde voie tout, sans dupliquer
-   la logique de tirage pondéré. */
-DUEL.pickScenario = function (positionId) {
-  const pool = DUEL.LIB.filter((t) => !t.positions || (positionId && t.positions.includes(positionId)));
+   la logique de tirage pondéré.
+
+   `roundIndex`/`roundsTotal`/`posSeen` (optionnels, rétrocompatibles —
+   un appel sans eux garde l'ancien comportement, pur hasard) garantissent
+   qu'un match donne à voir 1-2 des situations du poste au lieu de les
+   laisser au hasard (parfois 0 sur tout un match sur 35 situations
+   possibles dont seulement 4 dédiées). On force le tirage dans le
+   sous-pool du poste seulement quand il ne reste plus assez de rounds
+   pour l'atteindre naturellement — le reste du temps le tirage normal,
+   pondéré sur tout le pool, s'applique sans changement. */
+DUEL.pickScenario = function (positionId, roundIndex, roundsTotal, posSeen) {
+  const posPool = positionId ? DUEL.LIB.filter((t) => t.positions && t.positions.includes(positionId)) : [];
+  const target = Math.min(2, posPool.length);
+  const roundsLeft = roundsTotal - (roundIndex || 0);
+  const mustForcePosition = !!roundsTotal && target > 0 && (target - (posSeen || 0)) >= roundsLeft;
+  const pool = mustForcePosition
+    ? posPool
+    : DUEL.LIB.filter((t) => !t.positions || (positionId && t.positions.includes(positionId)));
   const weights = pool.map((t) => t.w || 1);
   const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total, i = 0;
@@ -623,12 +648,24 @@ DUEL.nextMechStreak = function (progress, mech) {
   return progress && progress.lastMech === mech ? (progress.mechStreak || 0) + 1 : 0;
 };
 
-DUEL.deriveBonus = function (progress, tell, mech, useSignature) {
+/* `attrs` (optionnel, rétrocompatible) active deux attributs jusque-là
+   sans effet en match : `leadership` atténue la pénalité de main
+   glaciale (momentum négatif), `stamina` atténue (ou aggrave, si basse)
+   la pénalité de fatigue de mécanique — jusqu'à ±40 % selon la valeur. */
+DUEL.deriveBonus = function (progress, tell, mech, useSignature, attrs) {
   let bonus = 0;
   if (tell && tell.favors === mech) bonus += 0.09;
   const momentum = (progress && progress.momentum) || 0;
-  bonus += ENG.clamp(momentum, -3, 3) * 0.025;
-  if (progress && progress.lastMech === mech && (progress.mechStreak || 0) >= 2) bonus -= 0.06;
+  let momentumBonus = ENG.clamp(momentum, -3, 3) * 0.025;
+  if (momentumBonus < 0) {
+    const leadership = (attrs && attrs.leadership) || 50;
+    momentumBonus *= 1 - ENG.clamp((leadership - 50) / 200, 0, 0.35);
+  }
+  bonus += momentumBonus;
+  if (progress && progress.lastMech === mech && (progress.mechStreak || 0) >= 2) {
+    const stamina = (attrs && attrs.stamina) || 50;
+    bonus -= 0.06 * (1 - ENG.clamp((stamina - 50) / 125, -0.4, 0.4));
+  }
   if (useSignature) bonus += 0.22;
   return bonus;
 };
@@ -675,10 +712,20 @@ DUEL.scoutingLine = function (attrs, name) {
    scenarios.js, mais sans second joueur à comparer : ici c'est
    ta propre carrière parallèle qui avance. `bonus` agrège tell,
    momentum, fatigue et coup signature (voir DUEL.deriveBonus). */
+/* Bases volontairement proches : `pass` avait un avantage d'espérance de
+   gain structurel (0.58 contre 0.48/0.50) qui en faisait le choix
+   objectivement dominant peu importe le profil du joueur — resserré pour
+   que ce soit les attributs et le contexte (tell, momentum, poste) qui
+   fassent la différence, pas une constante cachée dans la formule.
+   `post`/`line` activent des attributs jusque-là sans aucun effet en
+   match (voir DATA.ATTRS) : jeu au contact dans la raquette pour `post`,
+   provoquer la faute et convertir aux lancers pour `line`. */
 DUEL.ODDS = {
-  shoot: { keys: ["three", "midrange", "finishing"], base: 0.48 },
+  shoot: { keys: ["three", "midrange", "finishing"], base: 0.5 },
   drive: { keys: ["handle", "athleticism", "finishing"], base: 0.5 },
-  pass:  { keys: ["passing", "iq"], base: 0.58 },
+  pass:  { keys: ["passing", "iq"], base: 0.53 },
+  post:  { keys: ["interiorD", "block", "rebounding"], base: 0.5 },
+  line:  { keys: ["freeThrow", "clutch"], base: 0.55 },
 };
 
 DUEL.avg = function (attrs, keys) {
@@ -713,28 +760,72 @@ DUEL.resolveChoice = function (sc, mech, attrs, clutchWeighted, bonus) {
     if (!success) {
       return { points: 0, success: false, headline: "Passe manquée",
         text: ENG.R.pick(["La défense lit la passe et récupère le ballon.",
-                           "Passe trop appuyée, elle sort des limites."]),
+                           "Passe trop appuyée, elle sort des limites.",
+                           "Le relais est intercepté en plein vol.",
+                           "Ton partenaire n'était pas prêt, ballon perdu.",
+                           "La passe part une fraction de seconde trop tard."]),
         flags: { turnover: true } };
     }
     return { points: 2, success: true, headline: "Panier assisté",
       text: ENG.R.pick(["Tu trouves l'ouverture parfaite pour un panier facile.",
-                         "Ballon qui circule, tu sers le tir le plus simple du monde."]),
+                         "Ballon qui circule, tu sers le tir le plus simple du monde.",
+                         "La passe décisive traverse toute la défense.",
+                         "Lecture parfaite, le ballon arrive à qui il faut.",
+                         "Un caviar en plein match, la salle apprécie."]),
       flags: {} };
   }
 
   if (mech === "shoot") {
     if (success) {
-      const three = sc.id === "corner_three" || sc.id === "fastbreak" || sc.id === "clutch_iso";
+      const three = !!sc.three;
       return { points: three ? 3 : 2, success: true, headline: three ? "Trois points !" : "Panier",
         text: ENG.R.pick([`Tu t'élèves et comptes${three ? " de loin" : ""} !`,
                            "Swish. Tu ne trembles pas.",
-                           "Tu trouves le fond du filet malgré la défense."]),
+                           "Tu trouves le fond du filet malgré la défense.",
+                           "Le geste est propre, la balle ne touche que le filet.",
+                           "Aucun doute dès la sortie de main."]),
         flags: {} };
     }
     return { points: 0, success: false, headline: "Tir manqué",
       text: ENG.R.pick(["La défense conteste fort, la balle heurte l'arceau.",
                          "Tu tires à côté sous la pression.",
-                         "Air ball — la défense avait bien lu le coup."]),
+                         "Air ball — la défense avait bien lu le coup.",
+                         "Le tir sort du cadre, la défense souffle.",
+                         "Trop court, la balle retombe dans les mains adverses."]),
+      flags: {} };
+  }
+
+  if (mech === "post") {
+    if (success) {
+      return { points: 2, success: true, headline: "Panier dans le trafic",
+        text: ENG.R.pick(["Tu t'imposes en post et marques dans le trafic.",
+                           "Ta position est intenable, panier facile.",
+                           "Tu absorbes le contact et marques quand même.",
+                           "Tu domines physiquement sous le cercle."]),
+        flags: {} };
+    }
+    return { points: 0, success: false, headline: "Raquette fermée",
+      text: ENG.R.pick(["La défense tient sa position, rien à faire.",
+                         "Trop de bras autour du cercle, le tir est contesté.",
+                         "Tu perds l'équilibre dans le trafic.",
+                         "La raquette reste fermée."]),
+      flags: {} };
+  }
+
+  if (mech === "line") {
+    if (success) {
+      return { points: 2, success: true, headline: "Faute provoquée",
+        text: ENG.R.pick(["Tu provoques la faute et convertis aux lancers.",
+                           "Deux lancers, deux succès.",
+                           "Le contact est sifflé, tu ne trembles pas à la ligne.",
+                           "Tu vas chercher les lancers et les rentres sans forcer."]),
+        flags: {} };
+    }
+    return { points: 0, success: false, headline: "Aucune faute",
+      text: ENG.R.pick(["Le sifflet reste silencieux, pas de faute.",
+                         "L'arbitre laisse jouer, aucune faute sifflée.",
+                         "Tu rates ta ligne au pire moment.",
+                         "Le contact est jugé insuffisant."]),
       flags: {} };
   }
 
@@ -744,14 +835,22 @@ DUEL.resolveChoice = function (sc, mech, attrs, clutchWeighted, bonus) {
     return { points: andOne ? 3 : 2, success: true, headline: andOne ? "Panier + faute !" : "Panier au cercle",
       text: ENG.R.pick([`Tu pénètres et marques${andOne ? ", et la faute en plus !" : " au cercle !"}`,
                          "Coast to coast, tu conclus au cercle.",
-                         "Tu exploses au-dessus de la défense !"]),
+                         "Tu exploses au-dessus de la défense !",
+                         "Tu fends la défense et conclus en douceur.",
+                         "Une explosion vers le cercle, personne ne peut suivre."]),
       flags: {} };
   }
-  const blocked = ENG.R.chance(0.35);
+  /* durability : un joueur résistant perd moins souvent le ballon sur un
+     contact manqué — jusqu'à -12 points de risque de contre à durability
+     élevée (0.35 de base, jamais en dessous de 0.23). */
+  const durabilityGuard = ENG.clamp((((attrs && attrs.durability) || 50) - 50) / 400, 0, 0.12);
+  const blocked = ENG.R.chance(0.35 - durabilityGuard);
   return { points: 0, success: false, headline: blocked ? "Contré !" : "Tir manqué",
     text: ENG.R.pick(blocked
-      ? ["La défense referme la voie et contre proprement !", "Contre monumental !"]
-      : ["Tu perds l'équilibre en pénétrant, tir manqué.", "La défense tient bon."]),
+      ? ["La défense referme la voie et contre proprement !", "Contre monumental !",
+         "Ta tentative repart d'où elle vient, contrée sèchement.", "Rejetée avec autorité."]
+      : ["Tu perds l'équilibre en pénétrant, tir manqué.", "La défense tient bon.",
+         "Le chemin se referme au dernier moment.", "La finition manque de justesse."]),
     flags: { blocked } };
 };
 
@@ -1160,16 +1259,17 @@ DUEL.listenProgress = function (cb) {
 /* Chacun n'écrit jamais que dans son propre coin : pas de course à
    arbitrer entre les deux joueurs, donc pas besoin de transaction
    ici — une simple écriture suffit. */
-DUEL.startMyRun = function (positionId, sigUsesLeft) {
-  const sc = DUEL.pickScenario(positionId);
+DUEL.startMyRun = function (positionId, sigUsesLeft, roundsTotal) {
+  const sc = DUEL.pickScenario(positionId, 0, roundsTotal, 0);
   const tell = DUEL.pickTell();
   DUEL.db.ref(`${DUEL.ROOT}/${DUEL.code}/progress/${DUEL.seat}`).set({
     score: 0, count: 0, scenarioId: sc.id, tellId: tell.id, lastOutcome: null,
     momentum: 0, lastMech: null, mechStreak: 0, sigUsesLeft: sigUsesLeft || 0, taunt: null,
+    posSeen: sc.positions ? 1 : 0,
   });
 };
 
-DUEL.submitMyChoice = function (choiceIdx, attrs, positionId, useSignature, extraBonus) {
+DUEL.submitMyChoice = function (choiceIdx, attrs, positionId, useSignature, extraBonus, roundsTotal) {
   const ref = DUEL.db.ref(`${DUEL.ROOT}/${DUEL.code}/progress/${DUEL.seat}`);
   ref.get().then((snap) => {
     const cur = snap.val();
@@ -1177,10 +1277,10 @@ DUEL.submitMyChoice = function (choiceIdx, attrs, positionId, useSignature, extr
     const sc = DUEL.LIB.find((t) => t.id === cur.scenarioId) || DUEL.LIB[0];
     const choice = sc.ch[choiceIdx] || sc.ch[0];
     const tell = DUEL.TELLS.find((t) => t.id === cur.tellId) || null;
-    const bonus = DUEL.deriveBonus(cur, tell, choice.mech, useSignature) + (extraBonus || 0);
+    const bonus = DUEL.deriveBonus(cur, tell, choice.mech, useSignature, attrs) + (extraBonus || 0);
     let outcome = DUEL.resolveChoice(sc, choice.mech, attrs, !!sc.clutchWeighted, bonus);
     if (useSignature) outcome = DUEL.applySignatureFlavor(outcome);
-    const nextSc = DUEL.pickScenario(positionId);
+    const nextSc = DUEL.pickScenario(positionId, cur.count + 1, roundsTotal, cur.posSeen || 0);
     const nextTell = DUEL.pickTell();
     ref.set({
       score: cur.score + (outcome.points || 0),
@@ -1193,6 +1293,7 @@ DUEL.submitMyChoice = function (choiceIdx, attrs, positionId, useSignature, extr
       mechStreak: DUEL.nextMechStreak(cur, choice.mech),
       sigUsesLeft: Math.max(0, (cur.sigUsesLeft || 0) - (useSignature ? 1 : 0)),
       taunt: cur.taunt || null,
+      posSeen: (cur.posSeen || 0) + (nextSc.positions ? 1 : 0),
     });
   });
 };
@@ -1200,12 +1301,12 @@ DUEL.submitMyChoice = function (choiceIdx, attrs, positionId, useSignature, extr
 /* Le temps est écoulé sans choix : traité comme une perte de balle,
    même forme de résultat qu'un choix raté pour ne pas complexifier
    l'affichage en aval. */
-DUEL.submitTimeout = function (positionId) {
+DUEL.submitTimeout = function (positionId, roundsTotal) {
   const ref = DUEL.db.ref(`${DUEL.ROOT}/${DUEL.code}/progress/${DUEL.seat}`);
   ref.get().then((snap) => {
     const cur = snap.val();
     if (!cur) return;
-    const nextSc = DUEL.pickScenario(positionId);
+    const nextSc = DUEL.pickScenario(positionId, cur.count + 1, roundsTotal, cur.posSeen || 0);
     const nextTell = DUEL.pickTell();
     ref.set({
       score: cur.score,
@@ -1220,6 +1321,7 @@ DUEL.submitTimeout = function (positionId) {
       mechStreak: 0,
       sigUsesLeft: cur.sigUsesLeft || 0,
       taunt: cur.taunt || null,
+      posSeen: (cur.posSeen || 0) + (nextSc.positions ? 1 : 0),
     });
   });
 };

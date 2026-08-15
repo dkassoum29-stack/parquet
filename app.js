@@ -3435,7 +3435,7 @@ function duelOnRoomChange(room) {
   duelShowScoutingThen(theirs.name || "l'adversaire", theirs.attrs, () => {
     show("screen-duel-live");
     duelRenderScorebugShell();
-    DUEL.startMyRun(DUEL_UI.avatar.position, DUEL.signatureUsesForCharacter(DUEL_UI.avatar));
+    DUEL.startMyRun(DUEL_UI.avatar.position, DUEL.signatureUsesForCharacter(DUEL_UI.avatar), DUEL_UI.roundsTotal);
     DUEL_UI.oppProgress = { score: 0, count: 0 };
     DUEL.listenProgress((progress) => duelOnProgressChange(progress));
   });
@@ -3457,10 +3457,11 @@ function worldStartAiMatch(aiAttrs, aiName, onDone, competition) {
   DUEL_UI.enteredLive = true;
   show("screen-duel-live");
   duelRenderScorebugShell();
-  const sc = DUEL.pickScenario(DUEL_UI.avatar.position);
+  const sc = DUEL.pickScenario(DUEL_UI.avatar.position, 0, DUEL_UI.roundsTotal, 0);
   const tell = DUEL.pickTell();
   DUEL_UI.myProgress = { score: 0, count: 0, scenarioId: sc.id, tellId: tell.id, lastOutcome: null,
-    momentum: 0, lastMech: null, mechStreak: 0, sigUsesLeft: DUEL.signatureUsesForCharacter(DUEL_UI.avatar) };
+    momentum: 0, lastMech: null, mechStreak: 0, sigUsesLeft: DUEL.signatureUsesForCharacter(DUEL_UI.avatar),
+    posSeen: sc.positions ? 1 : 0 };
   DUEL_UI.oppProgress = { score: 0, count: 0 };
   duelUpdateScoreDisplay();
   duelRenderMySituation();
@@ -3775,12 +3776,12 @@ function duelRenderMySituation(skipNext) {
 
 function duelSubmitChoice(idx, extraBonus, useSignature) {
   if (DUEL_UI.mode === "ai") aiApplyMyRound(idx, extraBonus, useSignature);
-  else DUEL.submitMyChoice(idx, DUEL_UI.avatar.attrs, DUEL_UI.avatar.position, useSignature, extraBonus);
+  else DUEL.submitMyChoice(idx, DUEL_UI.avatar.attrs, DUEL_UI.avatar.position, useSignature, extraBonus, DUEL_UI.roundsTotal);
 }
 
 function duelSubmitTimeout() {
   if (DUEL_UI.mode === "ai") aiApplyMyRound(null, 0, false);
-  else DUEL.submitTimeout(DUEL_UI.avatar.position);
+  else DUEL.submitTimeout(DUEL_UI.avatar.position, DUEL_UI.roundsTotal);
 }
 
 /* ─── résolution locale d'un round contre l'IA ───
@@ -3797,7 +3798,7 @@ function aiApplyMyRound(idx, extraBonus, useSignature) {
 
   let outcome;
   if (choice) {
-    const bonus = DUEL.deriveBonus(mine, tell, choice.mech, useSignature) + (extraBonus || 0);
+    const bonus = DUEL.deriveBonus(mine, tell, choice.mech, useSignature, DUEL_UI.avatar.attrs) + (extraBonus || 0);
     outcome = DUEL.resolveChoice(sc, choice.mech, DUEL_UI.avatar.attrs, !!sc.clutchWeighted, bonus);
     if (useSignature) outcome = DUEL.applySignatureFlavor(outcome);
   } else {
@@ -3806,9 +3807,9 @@ function aiApplyMyRound(idx, extraBonus, useSignature) {
   }
   if (!outcome.success) DUEL_UI.perfect = false;
 
-  const nextSc = DUEL.pickScenario(DUEL_UI.avatar.position);
-  const nextTell = DUEL.pickTell();
   const newCount = mine.count + 1;
+  const nextSc = DUEL.pickScenario(DUEL_UI.avatar.position, newCount, DUEL_UI.roundsTotal, mine.posSeen || 0);
+  const nextTell = DUEL.pickTell();
   DUEL_UI.myProgress = {
     score: mine.score + (outcome.points || 0),
     count: newCount,
@@ -3820,6 +3821,7 @@ function aiApplyMyRound(idx, extraBonus, useSignature) {
     lastMech: choice ? choice.mech : null,
     mechStreak: choice ? DUEL.nextMechStreak(mine, choice.mech) : 0,
     sigUsesLeft: Math.max(0, (mine.sigUsesLeft || 0) - (useSignature ? 1 : 0)),
+    posSeen: (mine.posSeen || 0) + (nextSc.positions ? 1 : 0),
   };
 
   const aiSc = DUEL.pickScenario();

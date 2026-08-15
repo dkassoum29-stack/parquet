@@ -620,7 +620,11 @@ ENG.awards = function (L, me) {
   pool.forEach((x) => { x.v = ENG.valueScore(x.s, x.wins, x.s.gp); });
 
   if (me) {
-    me.v = ENG.valueScore(me.s, me.wins, me.s.gp);
+    /* léger handicap sur la seule course aux trophées (MVP/All-NBA/All-Star) :
+       même principe que defScore juste en dessous pour le DPOY — sans lui,
+       le joueur humain raflait ces titres trop souvent. season.value (servant
+       ailleurs : progression du potentiel, narration) reste lui intact. */
+    me.v = ENG.valueScore(me.s, me.wins, me.s.gp) * 0.93;
     pool.push(me);
   }
 
@@ -833,6 +837,11 @@ ENG.progress = function (p, opt) {
     }
     /* le QI et le leadership résistent au temps */
     if ((a.id === "iq" || a.id === "leadership") && d < 0) d *= 0.28;
+
+    /* passé 95, chaque point coûte plus cher — la Maîtrise ci-dessus
+       rendait la note parfaite trop facile à boucler une fois le palier
+       atteint ; on ralentit sans la rendre hors de portée. */
+    if (cur >= 95 && d > 0) d *= 0.5;
 
     let next = cur + d;
     if (d > 0 && next > cap) next = Math.max(cur, cap);   /* on ne dépasse pas le plafond */

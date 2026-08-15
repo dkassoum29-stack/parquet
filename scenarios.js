@@ -334,6 +334,28 @@ S_({ id: "hs_offer", cat: "Famille", ph: ["hs"], w: 2,
       run: (c, b) => O("Le premier virement tombe. Tu deviens l'adulte de la maison à dix-sept ans.", { money: b.n1 * 1000, morale: -4, leadership: 5, rep: 4 }, null, "money") },
   ] });
 
+S_({ id: "hs_press_break", cat: "Création", ph: ["hs"], w: 2, when: isGuard,
+  head: "Le pressing adverse cible ton dribble",
+  body: "Deux défenseurs se relaient sur toi dès l'engagement. En tant que meneur, {coachL} veut voir comment tu gères la pression.",
+  ch: [
+    { h: "Casser le pressing seul", d: "Assumer le ballon dans tes mains.", t: "Prise de risque",
+      run: luck(0.55,
+        () => O("Tu casses le press à toi seul, la salle se lève.", { handle: 5, iq: 3, morale: 6 }, { coach: 6 }),
+        () => O("Le double-poste te prend le ballon, la panique s'installe un instant.", { handle: -1, morale: -4 }, { coach: -4 })) },
+    { h: "Faire tourner vite", d: "Laisser {mate} avancer le ballon.", t: "Collectif",
+      run: () => O("Le ballon circule, le pressing se dissout tout seul.", { passing: 4, iq: 3 }, { locker: 5 }) },
+  ] });
+
+S_({ id: "hs_paint_growth", cat: "Raquette", ph: ["hs"], w: 2, when: isBig,
+  head: "Ton corps ne suit pas encore ton envergure",
+  body: "{coachL} est {coachStyle} : il te prévient qu'à ton poste, la force se construit maintenant ou jamais.",
+  ch: [
+    { h: "Multiplier les séances de muscu", d: "Miser sur le physique.", t: "Travail de fond",
+      run: () => O("Les épaules s'élargissent, la raquette devient un peu plus ton territoire.", { interiorD: 5, rebounding: 4, durability: 4 }, { coach: 5 }) },
+    { h: "Miser sur la technique", d: "Compenser par le geste.", t: "Finesse",
+      run: () => O("Tu ne gagnes pas encore les duels de force, mais tu commences à les éviter intelligemment.", { finishing: 4, block: 3, iq: 3 }, { coach: 2 }) },
+  ] });
+
 /* ─────────────────────────────────────────────
    UNIVERSITÉ
    ───────────────────────────────────────────── */
@@ -421,6 +443,28 @@ S_({ id: "nc_mate", cat: "Vestiaire", ph: ["ncaa"], w: 3,
       run: () => O("Il revient dans le groupe et enchaîne trois bons matchs. Le vestiaire a vu qui tu es.", { leadership: 9, iq: 3, morale: 4 }, { locker: 12, coach: 6 }) },
     { h: "Laisser le staff gérer", d: "Ce n'est pas ton rôle.", t: "Concentration",
       run: () => O("Tu restes concentré sur ton jeu. Le staff s'en occupe, mal.", { three: 3, finishing: 3, leadership: -3 }, { locker: -6 }) },
+  ] });
+
+S_({ id: "nc_floor_general", cat: "Création", ph: ["ncaa"], w: 3, when: isGuard,
+  head: "Le coach te confie les clés du tempo",
+  body: "{coachL} veut un meneur qui pense avant de dribbler — à toi de montrer que ce poste, c'est plus qu'un titre.",
+  ch: [
+    { h: "Ralentir le jeu, chercher la faille", d: "Un basket de contrôle.", t: "QI basket",
+      run: () => O("Chaque possession se construit posément. {coachL} apprécie la maturité.", { iq: 5, passing: 4 }, { coach: 6 }) },
+    { h: "Pousser le rythme à fond", d: "Un basket de vitesse.", t: "Transition",
+      run: () => O("Le rythme est débridé, l'équipe s'en amuse plus qu'elle n'y gagne en efficacité.", { handle: 4, athleticism: 3 }, { coach: 1 }) },
+  ] });
+
+S_({ id: "nc_double_team", cat: "Raquette", ph: ["ncaa"], w: 3, when: isBig,
+  head: "Deux défenseurs t'attendent à chaque possession",
+  body: "L'entraîneur adverse a donné une consigne claire à son équipe : ne jamais te laisser seul près du cercle.",
+  ch: [
+    { h: "Jouer avec le double-poste", d: "Ressortir vite vers le tireur ouvert.", t: "Altruisme",
+      run: () => O("Le ballon ressort à chaque fois vers un tireur ouvert. Tes passes décisives explosent ce soir-là.", { passing: 4, iq: 3 }, { coach: 5 }) },
+    { h: "Forcer malgré les bras", d: "Imposer le rapport de force.", t: "Puissance",
+      run: luck(0.5,
+        () => O("Tu marques malgré les deux défenseurs, la salle gronde.", { finishing: 5, interiorD: 3, rep: 4 }, null),
+        () => O("Le double-poste te fait perdre le ballon, occasion gâchée.", { morale: -3 }, { coach: -3 })) },
   ] });
 
 /* ─────────────────────────────────────────────
@@ -1092,6 +1136,52 @@ S_({ id: "pro_system", cat: "Staff", ph: ["pro"], w: 3,
             () => O("Il réécrit son attaque autour de toi. Les résultats suivent.", { rep: 8, morale: 8 }, { coach: 4 }),
             () => O("Il refuse et te le fait payer sur les minutes. La saison est longue.", { morale: -12 }, { coach: -12 })) },
       ]) },
+  ] });
+
+S_({ id: "pro_assist_chase", cat: "Création", ph: ["pro"], w: 3,
+  when: (c) => isGuard(c) && c.season && c.season.apg >= 6,
+  n: () => ({ n2: R_().i(15, 19) }),
+  head: "Une chance de battre ton record de passes",
+  body: "Contre {opp}, tes coéquipiers rentrent tout ce que tu leur donnes ce soir. Le record de la franchise n'est plus très loin.",
+  ch: [
+    { h: "Continuer à chercher la passe", d: "Aller au bout.", t: "Record",
+      run: luck(0.5,
+        (c, b) => O("Tu boucles la soirée à " + b.n2 + " passes décisives, nouveau record de franchise.",
+                    { passing: 6, iq: 4, fame: 8, rep: 6, followers: 500, morale: 8 }, { locker: 6 }, "epic"),
+        () => O("Le record t'échappe de peu, mais l'équipe encaisse la victoire.", { passing: 3, iq: 2 }, { locker: 4 })) },
+    { h: "Jouer normalement, sans forcer", d: "Le collectif avant les chiffres.", t: "Sobriété",
+      run: () => O("Tu laisses le jeu venir à toi. Personne ne remarque que tu visais un record.", { iq: 3, leadership: 4 }, { locker: 6 }) },
+  ] });
+
+S_({ id: "pro_rebound_title", cat: "Rebond", ph: ["pro"], w: 3,
+  when: (c) => isBig(c) && c.season && c.season.rpg >= 9,
+  head: "La course au titre de meilleur rebondeur s'accélère",
+  body: "Un rival à un autre poste te dispute la première place, match après match. Les statistiques se ressemblent au dixième près.",
+  ch: [
+    { h: "Se battre sur chaque ballon", d: "Ne rien laisser passer.", t: "Obsession",
+      run: () => O("Tu grappilles chaque rebond disputable. Le classement s'en ressent, ton corps aussi.", { rebounding: 5, durability: -2, fame: 5 }, null) },
+    { h: "Jouer le collectif d'abord", d: "Le rebond viendra tout seul.", t: "Équilibre",
+      run: () => O("Tu restes dans le système plutôt que de chasser les chiffres. Le vestiaire respecte le choix.", { rebounding: 3, leadership: 3 }, { locker: 4 }) },
+  ] });
+
+S_({ id: "pro_perimeter_lockdown", cat: "Défense de périmètre", ph: ["pro"], w: 3, when: isGuard,
+  head: "On te confie la meilleure marque adverse",
+  body: "{coachL} veut un défenseur extérieur capable de suivre le meilleur scoreur d'en face, possession après possession.",
+  ch: [
+    { h: "Accepter la mission", d: "Prendre la responsabilité défensive.", t: "Défenseur désigné",
+      run: () => O("Tu colles à ton vis-à-vis toute la soirée. {coachL} n'a plus à s'inquiéter de ce côté du terrain.", { perimeterD: 5, steal: 3, stamina: -2 }, { coach: 6 }) },
+    { h: "Rester sur ton rôle offensif", d: "Laisser un autre s'en charger.", t: "Spécialisation",
+      run: () => O("Tu restes concentré sur l'attaque. {coachL} confie la mission à quelqu'un d'autre.", { three: 3, midrange: 2 }, { coach: -3 }) },
+  ] });
+
+S_({ id: "pro_rim_protector", cat: "Raquette", ph: ["pro"], w: 3, when: isBig,
+  head: "Ta réputation de protecteur du cercle grandit",
+  body: "Les adversaires évitent maintenant de pénétrer de ton côté du terrain. {journo} veut en faire un sujet.",
+  ch: [
+    { h: "Cultiver l'intimidation", d: "En faire une arme psychologique.", t: "Dissuasion",
+      run: () => O("Ta présence seule fait renoncer des attaquants avant même le contact. {outlet} en parle en boucle.", { block: 5, interiorD: 4, fame: 5 }, { media: 4 }) },
+    { h: "Rester discret là-dessus", d: "Laisser les statistiques parler.", t: "Sobriété",
+      run: () => O("Tu ne dis rien, tu continues de contrer sans commenter.", { block: 3, interiorD: 3 }, null) },
   ] });
 
 /* ─────────────────────────────────────────────
